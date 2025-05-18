@@ -1,178 +1,171 @@
-# P2P File Synchronization
+# Distributed File Synchronization System
 
-A lightweight peer-to-peer file synchronization script that enables bidirectional synchronization between two directories, either on the same machine or across different machines on a network.
+This project implements a real-time file synchronization system that allows files to be kept in sync across multiple devices. It's similar in concept to services like Dropbox or Google Drive, but as a self-hosted solution.
 
 ## Features
 
-- **Bidirectional synchronization** between two peers
-- **Real-time file change detection** using watchdog
-- **Periodic synchronization** every 5 seconds
-- **MD5 hash comparison** to avoid unnecessary transfers
-- **Conflict resolution** based on modification timestamps
-- **Proper handling of empty files**
-- **Automatic directory creation**
-- Handles file **additions**, **modifications**, and **deletions**
+- Real-time file synchronization across multiple devices
+- Web-based user interface for file management
+- WebSocket-based notifications for instant updates
+- File change detection using file system watchers
+- Conflict resolution using file timestamps and hash comparisons
+- RESTful API for file operations
+- Support for file uploads, downloads, and deletions
 
-## Prerequisites
+## Architecture
 
-- Python 3.6 or higher
-- `watchdog` library for file change detection
+The system consists of two main components:
 
-## Installation
+1. **Server**: A Node.js application that manages file storage, detects changes, and broadcasts updates to connected clients.
+2. **Client**: A web-based interface that allows users to view, upload, download, and delete files.
 
-1. Install the required Python package:
+### How It Works
 
-```bash
-pip install watchdog
-```
+- Files are stored in a designated directory on the server
+- The server watches for file system changes using the `chokidar` library
+- When a file is added, modified, or deleted, the change is detected and broadcast to all connected clients
+- Clients receive real-time updates via WebSocket connections
+- Each client has a unique ID to prevent echo effects (ignoring its own changes)
+- Files are identified by their path, and changes are tracked using file hashes and timestamps
 
-2. Download the `p2p_sync.py` script
+## Getting Started
 
-## Basic Usage
+### Prerequisites
 
-Run the script on two different locations (peers) with different port configurations:
+- Node.js (v14 or later)
+- npm (v6 or later)
 
-### On Peer 1:
+### Installation
 
-```bash
-python p2p_sync.py --local-port 8001 --remote-port 8002 --dir ./shared_dir1
-```
-
-### On Peer 2:
-
-```bash
-python p2p_sync.py --local-port 8002 --remote-port 8001 --dir ./shared_dir2
-```
-
-## Command Line Options
-
-| Option | Description | Default | Required |
-|--------|-------------|---------|----------|
-| `--local-port` | Local port for the server to listen on | - | Yes |
-| `--remote-port` | Remote port to connect to | - | Yes |
-| `--remote-host` | Remote host to connect to | localhost | No |
-| `--dir` | Directory to synchronize | - | Yes |
-| `--initial-sync-delay` | Delay in seconds before initial sync | 3 | No |
-
-## How It Works
-
-### Architecture
-
-The script implements a peer-to-peer architecture where each peer:
-1. Runs a server to respond to sync requests
-2. Monitors the local directory for changes
-3. Periodically checks for changes on the remote peer
-4. Transfers files in both directions as needed
-
-### Synchronization Logic
-
-1. **File Indexing**:
-   - Creates an index of all files in the local directory
-   - For each file, records size, modification time, and MD5 hash
-
-2. **Change Detection**:
-   - Uses watchdog to detect real-time file system changes
-   - Schedules synchronization when changes are detected
-
-3. **Conflict Resolution**:
-   - Compares file hashes to detect changes
-   - Uses file modification times to resolve conflicts
-   - The newer version of a file always wins
-
-4. **File Deletion**:
-   - Only deletes files if they were deleted on the remote peer
-   - Preserves newly created local files
-   - Special protection for empty files
-
-### Network Protocol
-
-The script uses a simple TCP-based protocol:
-- JSON messages for commands and metadata
-- Raw binary transfers for file data
-- File size prefixing to handle boundaries
-
-## Special Handling
-
-### Empty Files
-
-Empty files (0 bytes) receive special handling:
-- Proper indexing and synchronization
-- Protected from accidental deletion
-- Fully tracked with detailed logging
-
-### Hidden Files
-
-- Files beginning with `.` are ignored by the sync process
-- The `.last_sync` file tracks synchronization timestamps
-- Temporary `.tmp` files are used during transfers and ignored
-
-## Log Messages
-
-The script provides detailed logging to help diagnose synchronization issues:
-
-- **File change detection**: "File change detected: [path] - Event type: [type]"
-- **Empty file tracking**: "Indexing empty file: [path]"
-- **Sync actions**: "Downloaded [path] ([size] bytes)" or "Deleted [path]"
-- **Error messages**: Various error conditions with details
-
-## Advanced Usage
-
-### Synchronizing Between Different Machines
-
-To synchronize between different machines on the same network:
+1. Clone the repository or download the source code
+2. Install dependencies:
 
 ```bash
-# On Machine A
-python p2p_sync.py --local-port 8001 --remote-port 8002 --remote-host 192.168.1.2 --dir ./shared_dir1
-
-# On Machine B (with IP 192.168.1.2)
-python p2p_sync.py --local-port 8002 --remote-port 8001 --remote-host 192.168.1.1 --dir ./shared_dir2
+npm install express http ws path fs-extra chokidar crypto
 ```
 
-### Firewall Configuration
+### Configuration
 
-Ensure that the ports used for synchronization are open on both machines:
-- Allow incoming TCP connections on the `--local-port`
-- Allow outgoing TCP connections to the `--remote-port`
+The server can be configured by modifying the configuration object in `server.js`. The main configurable options include:
+
+- `port`: The port number the server will listen on (default: 3000)
+- `syncDirectory`: The directory where files will be stored and synchronized
+
+### Running the Server
+
+Start the server by running:
+
+```bash
+node server.js
+```
+
+The server will begin listening on the configured port (default: 3000) and will create the sync directory if it doesn't exist.
+
+### Accessing the Client
+
+Once the server is running, you can access the web client by opening a browser and navigating to:
+
+```
+http://localhost:3000
+```
+
+## API Reference
+
+The system provides a RESTful API for file operations:
+
+### Get File List
+
+```
+GET /api/files
+```
+
+Returns a JSON array of all files in the sync directory, including metadata.
+
+### Upload File
+
+```
+POST /api/files/upload?path={filePath}
+```
+
+Uploads a file to the specified path. The request body should contain the file content.
+
+### Delete File
+
+```
+DELETE /api/files?path={filePath}
+```
+
+Deletes the file at the specified path.
+
+## WebSocket Protocol
+
+The system uses WebSockets for real-time updates. The main message types are:
+
+### Server to Client:
+
+- `init`: Initial data with file list
+- `file_change`: Notification of file changes (create, update, delete)
+- `file_data`: File content transfer
+
+### Client to Server:
+
+- `sync_request`: Request for file synchronization
+- `file_change`: Notification of client-side file changes
+
+## Security Considerations
+
+This implementation is designed as a demonstration and is not production-ready in terms of security. For a production environment, consider:
+
+- Adding user authentication and authorization
+- Implementing TLS/SSL encryption
+- Adding file permission controls
+- Implementing rate limiting
+- Adding proper error handling and validation
+
+## Extending the System
+
+This system can be extended in several ways:
+
+### Client Applications
+
+- Desktop clients using Electron or similar frameworks
+- Mobile applications using React Native or other mobile frameworks
+- Command-line interface for scripted operations
+
+### Additional Features
+
+- User accounts and authentication
+- Shared folders and collaboration features
+- Version history and file recovery
+- End-to-end encryption
+- Bandwidth throttling
+- Selective synchronization
+- Conflict resolution UI
+- Offline support with synchronization queues
 
 ## Limitations
 
-- Designed for synchronization between exactly two peers
-- No encryption of data in transit (use VPN or SSH tunneling for security)
-- No bandwidth throttling
-- No support for symbolic links or special files
-- Not optimized for very large files or directories with thousands of files
+- This implementation uses in-memory storage for file metadata, which would not persist across server restarts in a production environment
+- Large files might cause memory issues as the entire file is loaded into memory during upload/download
+- The conflict resolution strategy is simple and might not handle complex scenarios
+- No support for folder operations (create, move, etc.)
 
 ## Troubleshooting
 
 ### Connection Issues
 
-If peers cannot connect:
-1. Verify that both scripts are running
-2. Check that `--local-port` and `--remote-port` are set correctly
-3. Ensure firewalls allow traffic on the specified ports
-4. Verify network connectivity between peers
+If the client cannot connect to the server:
+- Check that the server is running
+- Verify network connectivity
+- Ensure no firewalls are blocking the connection
 
-### Synchronization Issues
+### File Synchronization Issues
 
 If files are not synchronizing properly:
-1. Check log messages for errors
-2. Verify that file paths don't contain special characters
-3. Ensure both peers have read/write permissions for their directories
-4. Try increasing the `--initial-sync-delay` parameter
-
-## Development
-
-### Future Improvements
-
-- Support for more than two peers
-- Bandwidth throttling
-- Delta transfers for large files
-- Encryption and authentication
-- GUI interface
-- Conflict resolution with manual intervention
-- Support for symbolic links and special files
+- Check the activity logs in the client interface
+- Verify file system permissions
+- Restart the server and refresh the client
 
 ## License
 
-This script is provided as-is for educational and personal use.
+This project is licensed under the MIT License - see the LICENSE file for details.

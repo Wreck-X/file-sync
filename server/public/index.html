@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed File Sync System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --dark-color: #2c3e50;
+            --light-color: #ecf0f1;
+            --gray-color: #95a5a6;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1, h2, h3 {
+            color: var(--dark-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-success {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 7fr 3fr;
+            gap: 20px;
+        }
+        
+        .file-list {
+            list-style-type: none;
+            margin-top: 15px;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .file-item:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .file-icon {
+            margin-right: 10px;
+            color: var(--primary-color);
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .client-list {
+            list-style-type: none;
+            margin-top: 15px;
+        }
+        
+        .client-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .client-name {
+            font-weight: bold;
+        }
+        
+        .client-details {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .file-upload {
+            margin-top: 20px;
+            padding: 15px 0;
+            border-top: 1px solid #eee;
+        }
+        
+        #fileUploadForm {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge {
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .badge-success {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 4px;
+            height: 10px;
+            margin-top: 5px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary-color);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        #serverStats {
+            font-size: 14px;
+            color: var(--gray-color);
+        }
+        
+        #clientId {
+            font-size: 12px;
+            color: var(--gray-color);
+        }
+        
+        .truncate {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 500px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 60%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="card login-container">
+                <h2>Register Client</h2>
+                <p>Register this device to synchronize files with other clients</p>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="clientName">Client Name:</label>
+                        <input type="text" id="clientName" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-success">Register Device</button>
+                </form>
+                <div id="loginStatus" class="status info hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="appContainer" class="container hidden">
+        <div class="header">
+            <div>
+                <h1>Distributed File Sync System</h1>
+                <p id="clientId"></p>
+                <p id="serverStats"></p>
+            </div>
+            <div>
+                <button id="disconnectBtn" class="btn btn-danger">Disconnect</button>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- File List Panel -->
+            <div class="card">
+                <h2>Files <span id="fileCount" class="badge badge-primary">0</span></h2>
+                <p>Files synchronized across all connected devices</p>
+                <ul id="fileList" class="file-list">
+                    <li class="file-item">
+                        <div>
+                            <i class="fa-solid fa-spinner"></i> Loading files...
+                        </div>
+                    </li>
+                </ul>
+                <div class="file-upload">
+                    <h3>Upload File</h3>
+                    <form id="fileUploadForm">
+                        <div class="form-group">
+                            <label for="fileInput">Select File:</label>
+                            <input type="file" id="fileInput" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="filePath">Save Path (optional):</label>
+                            <input type="text" id="filePath" class="form-control" placeholder="e.g., folder/file.txt">
+                            <small>Leave empty to use the original filename</small>
+                        </div>
+                        <button type="submit" class="btn btn-success">Upload File</button>
+                    </form>
+                    <div id="uploadStatus" class="hidden">
+                        <div class="spinner"></div>
+                        <span id="uploadStatusText">Uploading...</span>
+                        <div class="progress-bar-container">
+                            <div id="uploadProgress" class="progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Client List Panel -->
+            <div class="card">
+                <h2>Connected Clients <span id="clientCount" class="badge badge-primary">0</span></h2>
+                <p>Currently connected devices</p>
+                <ul id="clientList" class="client-list">
+                    <li class="client-item">
+                        <div>
+                            <i class="fa-solid fa-spinner"></i> Loading clients...
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application State
+        const appState = {
+            clientId: null,
+            assignedPort: null,
+            serverAddress: null,
+            serverPort: null,
+            files: new Map(),
+            clients: new Map(),
+            ws: null,
+            heartbeatInterval: null
+        };
+
+        // DOM Elements
+        const elements = {
+            loginModal: document.getElementById('loginModal'),
+            loginForm: document.getElementById('loginForm'),
+            loginStatus: document.getElementById('loginStatus'),
+            appContainer: document.getElementById('appContainer'),
+            clientId: document.getElementById('clientId'),
+            serverStats: document.getElementById('serverStats'),
+            disconnectBtn: document.getElementById('disconnectBtn'),
+            fileList: document.getElementById('fileList'),
+            fileCount: document.getElementById('fileCount'),
+            clientList: document.getElementById('clientList'),
+            clientCount: document.getElementById('clientCount'),
+            fileUploadForm: document.getElementById('fileUploadForm'),
+            fileInput: document.getElementById('fileInput'),
+            filePath: document.getElementById('filePath'),
+            uploadStatus: document.getElementById('uploadStatus'),
+            uploadStatusText: document.getElementById('uploadStatusText'),
+            uploadProgress: document.getElementById('uploadProgress')
+        };
+
+        // Show the login modal on load
+        window.addEventListener('DOMContentLoaded', () => {
+            showLoginModal();
+        });
+
+        // Login Form Submission
+        elements.loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const clientName = document.getElementById('clientName').value.trim();
+            
+            if (!clientName) {
+                showLoginStatus('Please enter a client name', 'error');
+                return;
+            }
+            
+            try {
+                showLoginStatus('Registering client...', 'info');
+                
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: clientName })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Registration failed');
+                }
+                
+                const data = await response.json();
+                
+                // Save client information
+                appState.clientId = data.clientId;
+                appState.assignedPort = data.assignedPort;
+                appState.serverAddress = data.serverAddress;
+                appState.serverPort = data.serverPort;
+                
+                // Connect to WebSocket
+                await connectWebSocket();
+                
+                // Start heartbeat
+                startHeartbeat();
+                
+                // Hide login modal and show app
+                hideLoginModal();
+                showApp();
+                
+                // Update UI with client info
+                elements.clientId.textContent = `Client ID: ${appState.clientId} | Port: ${appState.assignedPort}`;
+                elements.serverStats.textContent = `Server: ${appState.serverAddress}:${appState.serverPort}`;
+                
+                // Load initial data
+                loadFiles();
+                loadClients();
+                
+            } catch (error) {
+                showLoginStatus(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Disconnect Button
+        elements.disconnectBtn.addEventListener('click', async () => {
+            try {
+                await disconnectClient();
+                showLoginModal();
+                hideApp();
+            } catch (error) {
+                console.error('Error disconnecting:', error);
+            }
+        });
+
+        // File Upload Form
+        elements.fileUploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = elements.fileInput.files[0];
+            if (!file) {
+                alert('Please select a file to upload');
+                return;
+            }
+            
+            let uploadPath = elements.filePath.value.trim();
+            if (!uploadPath) {
+                uploadPath = file.name;
+            }
+            
+            // Normalize path (remove leading slash if present)
+            if (uploadPath.startsWith('/')) {
+                uploadPath = uploadPath.substring(1);
+            }
+            
+            try {
+                await uploadFile(file, uploadPath);
+                elements.fileUploadForm.reset();
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                elements.uploadStatusText.textContent = `Upload failed: ${error.message}`;
+                elements.uploadStatus.classList.add('error');
+                
+                // Hide the upload status after 3 seconds
+                setTimeout(() => {
+                    elements.uploadStatus.classList.add('hidden');
+                }, 3000);
+            }
+        });
+
+        // Connect to WebSocket
+        async function connectWebSocket() {
+            return new Promise((resolve, reject) => {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}?clientId=${appState.clientId}`;
+                
+                appState.ws = new WebSocket(wsUrl);
+                
+                appState.ws.onopen = () => {
+                    console.log('WebSocket connection established');
+                    resolve();
+                };
+                
+                appState.ws.onclose = () => {
+                    console.log('WebSocket connection closed');
+                    clearInterval(appState.heartbeatInterval);
+                };
+                
+                appState.ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    reject(new Error('WebSocket connection failed'));
+                };
+                
+                appState.ws.onmessage = handleWebSocketMessage;
+            });
+        }
+
+        // Handle WebSocket Messages
+        function handleWebSocketMessage(event) {
+            try {
+                const message = JSON.parse(event.data);
+                
+                switch (message.type) {
+                    case 'init':
+                        // Initialize with files and clients
+                        message.files.forEach(file => {
+                            appState.files.set(file.path, file);
+                        });
+                        
+                        message.clients.forEach(client => {
+                            appState.clients.set(client.id, client);
+                        });
+                        
+                        updateFileList();
+                        updateClientList();
+                        break;
+                    
+                    case 'file_change':
+                        handleFileChange(message);
+                        break;
+                    
+                    case 'client_event':
+                        handleClientEvent(message);
+                        break;
+                    
+                    case 'file_data':
+                        // Handle file data if needed
+                        break;
+                        
+                    default:
+                        console.log('Unknown message type:', message.type);
+                }
+            } catch (error) {
+                console.error('Error processing WebSocket message:', error);
+            }
+        }
+
+        // Handle File Changes
+        function handleFileChange(message) {
+            if (message.type === 'update') {
+                appState.files.set(message.file.path, message.file);
+            } else if (message.type === 'delete') {
+                appState.files.delete(message.path);
+            }
+            
+            updateFileList();
+        }
+
+        // Handle Client Events
+        function handleClientEvent(message) {
+            if (message.type === 'client_connected') {
+                // Load updated client list
+                loadClients();
+            } else if (message.type === 'client_disconnected') {
+                // Remove disconnected client
+                appState.clients.delete(message.clientId);
+                updateClientList();
+            }
+        }
+
+        // Start Heartbeat
+        function startHeartbeat() {
+            // Send heartbeat every 30 seconds
+            appState.heartbeatInterval = setInterval(async () => {
+                try {
+                    await fetch('/api/heartbeat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ clientId: appState.clientId })
+                    });
+                } catch (error) {
+                    console.error('Heartbeat error:', error);
+                }
+            }, 30000);
+        }
+
+        // Load Files
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) {
+                    throw new Error('Failed to load files');
+                }
+                
+                const files = await response.json();
+                
+                // Clear existing files and add new ones
+                appState.files.clear();
+                files.forEach(file => {
+                    appState.files.set(file.path, file);
+                });
+                
+                updateFileList();
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        // Load Clients
+        async function loadClients() {
+            try {
+                const response = await fetch('/api/clients');
+                if (!response.ok) {
+                    throw new Error('Failed to load clients');
+                }
+                
+                const clients = await response.json();
+                
+                // Clear existing clients and add new ones
+                appState.clients.clear();
+                clients.forEach(client => {
+                    appState.clients.set(client.id, client);
+                });
+                
+                updateClientList();
+            } catch (error) {
+                console.error('Error loading clients:', error);
+            }
+        }
+
+        // Update File List UI
+        function updateFileList() {
+            elements.fileList.innerHTML = '';
+            elements.fileCount.textContent = appState.files.size;
+            
+            if (appState.files.size === 0) {
+                elements.fileList.innerHTML = `
+                    <li class="file-item">
+                        <div>No files available</div>
+                    </li>
+                `;
+                return;
+            }
+            
+            // Sort files by path
+            const sortedFiles = Array.from(appState.files.values()).sort((a, b) => {
+                return a.path.localeCompare(b.path);
+            });
+            
+            sortedFiles.forEach(file => {
+                const fileItem = document.createElement('li');
+                fileItem.className = 'file-item';
+                
+                // Determine file icon based on extension
+                const extension = file.path.split('.').pop().toLowerCase();
+                let iconClass = 'fa-solid fa-file';
+                
+                if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(extension)) {
+                    iconClass = 'fa-solid fa-file-image';
+                } else if (['pdf'].includes(extension)) {
+                    iconClass = 'fa-solid fa-file-pdf';
+                } else if (['doc', 'docx', 'txt', 'md'].includes(extension)) {
+                    iconClass = 'fa-solid fa-file-lines';
+                } else if (['xls', 'xlsx', 'csv'].includes(extension)) {
+                    iconClass = 'fa-solid fa-file-excel';
+                } else if (['js', 'html', 'css', 'py', 'java', 'php'].includes(extension)) {
+                    iconClass = 'fa-solid fa-file-code';
+                } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(extension)) {
+                    iconClass = 'fa-solid fa-file-zipper';
+                }
+                
+                // Format file size
+                const formattedSize = formatFileSize(file.size);
+                
+                // Format last modified date
+                const formattedDate = new Date(file.lastModified).toLocaleString();
+                
+                fileItem.innerHTML = `
+                    <div>
+                        <i class="${iconClass} file-icon"></i>
+                        <span class="truncate">${file.path}</span>
+                        <div class="client-details">
+                            ${formattedSize} | Last Modified: ${formattedDate} | Uploaded by: ${file.uploadedBy === appState.clientId ? 'You' : file.uploadedBy.substring(0, 8) + '...'}
+                        </div>
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn btn-sm" onclick="downloadFile('${file.path}')">
+                            <i class="fa-solid fa-download"></i> Download
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </div>
+                `;
+                
+                elements.fileList.appendChild(fileItem);
+            });
+        }
+
+        // Update Client List UI
+        function updateClientList() {
+            elements.clientList.innerHTML = '';
+            elements.clientCount.textContent = appState.clients.size;
+            
+            if (appState.clients.size === 0) {
+                elements.clientList.innerHTML = `
+                    <li class="client-item">
+                        <div>No clients connected</div>
+                    </li>
+                `;
+                return;
+            }
+            
+            appState.clients.forEach(client => {
+                const clientItem = document.createElement('li');
+                clientItem.className = 'client-item';
+                
+                const isCurrentClient = client.id === appState.clientId;
+                const clientName = isCurrentClient ? `${client.name} (You)` : client.name;
+                
+                clientItem.innerHTML = `
+                    <div class="client-name">
+                        <i class="fa-solid fa-desktop"></i> ${clientName}
+                    </div>
+                    <div class="client-details">
+                        ID: ${client.id.substring(0, 8)}... | IP: ${client.ipAddress} | Port: ${client.port}
+                    </div>
+                `;
+                
+                elements.clientList.appendChild(clientItem);
+            });
+        }
+
+        // Upload File
+        async function uploadFile(file, path) {
+            // Show upload status
+            elements.uploadStatus.classList.remove('hidden', 'error');
+            elements.uploadStatusText.textContent = 'Uploading...';
+            elements.uploadProgress.style.width = '0%';
+            
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = async (event) => {
+                    try {
+                        const fileData = event.target.result;
+                        
+                        // Create a Blob from the file data
+                        const blob = new Blob([fileData]);
+                        
+                        // Create URL parameter
+                        const url = `/api/files/upload?path=${encodeURIComponent(path)}&clientId=${appState.clientId}`;
+                        
+                        // Use XMLHttpRequest to track upload progress
+                        const xhr = new XMLHttpRequest();
+                        
+                        xhr.open('POST', url, true);
+                        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                        
+                        // Track upload progress
+                        xhr.upload.onprogress = (e) => {
+                            if (e.lengthComputable) {
+                                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                                elements.uploadProgress.style.width = `${percentComplete}%`;
+                                elements.uploadStatusText.textContent = `Uploading... ${percentComplete}%`;
+                            }
+                        };
+                        
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                elements.uploadStatusText.textContent = 'Upload complete!';
+                                elements.uploadStatus.classList.add('success');
+                                
+                                // Hide the upload status after 3 seconds
+                                setTimeout(() => {
+                                    elements.uploadStatus.classList.add('hidden');
+                                }, 3000);
+                                
+                                resolve();
+                            } else {
+                                const error = JSON.parse(xhr.responseText);
+                                reject(new Error(error.error || 'Upload failed'));
+                            }
+                        };
+                        
+                        xhr.onerror = () => {
+                            reject(new Error('Network error during upload'));
+                        };
+                        
+                        xhr.send(blob);
+                        
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = () => {
+                    reject(new Error('Error reading file'));
+                };
+                
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Download File
+        function downloadFile(filePath) {
+            // Create a link to download the file
+            const downloadUrl = `/sync/${filePath}`;
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filePath.split('/').pop(); // Use the filename part
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Delete File
+        async function deleteFile(filePath) {
+            if (!confirm(`Are you sure you want to delete "${filePath}"? This cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/files?path=${encodeURIComponent(filePath)}&clientId=${appState.clientId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to delete file');
+                }
+                
+                // The file will be removed from the UI when the server sends the delete notification
+            } catch (error) {
+                console.error('Error deleting file:', error);
+                alert(`Error deleting file: ${error.message}`);
+            }
+        }
+
+        // Disconnect Client
+        async function disconnectClient() {
+            try {
+                // Close WebSocket
+                if (appState.ws) {
+                    appState.ws.close();
+                }
+                
+                // Clear heartbeat interval
+                clearInterval(appState.heartbeatInterval);
+                
+                // Send disconnect request to server
+                await fetch('/api/disconnect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ clientId: appState.clientId })
+                });
+                
+                // Clear application state
+                appState.clientId = null;
+                appState.assignedPort = null;
+                appState.files.clear();
+                appState.clients.clear();
+                appState.ws = null;
+                
+            } catch (error) {
+                console.error('Error disconnecting:', error);
+                throw error;
+            }
+        }
+
+        // Show Login Modal
+        function showLoginModal() {
+            elements.loginModal.style.display = 'block';
+            document.getElementById('clientName').focus();
+        }
+
+        // Hide Login Modal
+        function hideLoginModal() {
+            elements.loginModal.style.display = 'none';
+            elements.loginStatus.classList.add('hidden');
+        }
+
+        // Show App
+        function showApp() {
+            elements.appContainer.classList.remove('hidden');
+        }
+
+        // Hide App
+        function hideApp() {
+            elements.appContainer.classList.add('hidden');
+        }
+
+        // Show Login Status Message
+        function showLoginStatus(message, type) {
+            elements.loginStatus.textContent = message;
+            elements.loginStatus.className = `status ${type}`;
+            elements.loginStatus.classList.remove('hidden');
+        }
+
+        // Format File Size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+            alert(`An error occurred: ${event.error.message}`);
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', async (e) => {
+            // Only disconnect if logged in
+            if (appState.clientId) {
+                try {
+                    await disconnectClient();
+                } catch (error) {
+                    console.error('Error during disconnect:', error);
+                }
+            }
+        });
+
+        // Add global access to some functions for button onclick handlers
+        window.downloadFile = downloadFile;
+        window.deleteFile = deleteFile;
+    </script>
+</body>
+</html>
