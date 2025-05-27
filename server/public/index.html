@@ -4,986 +4,401 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Distributed File Sync System</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --dark-color: #2c3e50;
-            --light-color: #ecf0f1;
-            --gray-color: #95a5a6;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f8f9fa;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        h1, h2, h3 {
-            color: var(--dark-color);
-            margin-bottom: 0.5rem;
-        }
-        
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        
-        .btn:hover {
-            background-color: #2980b9;
-        }
-        
-        .btn-success {
-            background-color: var(--secondary-color);
-        }
-        
-        .btn-success:hover {
-            background-color: #27ae60;
-        }
-        
-        .btn-danger {
-            background-color: var(--danger-color);
-        }
-        
-        .btn-danger:hover {
-            background-color: #c0392b;
-        }
-        
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-        
-        .card {
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .grid {
-            display: grid;
-            grid-template-columns: 7fr 3fr;
-            gap: 20px;
-        }
-        
-        .file-list {
-            list-style-type: none;
-            margin-top: 15px;
-        }
-        
-        .file-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .file-item:hover {
-            background-color: #f5f5f5;
-        }
-        
-        .file-icon {
-            margin-right: 10px;
-            color: var(--primary-color);
-        }
-        
-        .file-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .client-list {
-            list-style-type: none;
-            margin-top: 15px;
-        }
-        
-        .client-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .client-name {
-            font-weight: bold;
-        }
-        
-        .client-details {
-            font-size: 12px;
-            color: #666;
-        }
-        
-        .file-upload {
-            margin-top: 20px;
-            padding: 15px 0;
-            border-top: 1px solid #eee;
-        }
-        
-        #fileUploadForm {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .login-container {
-            max-width: 400px;
-            margin: 100px auto;
-        }
-        
-        .status {
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        
-        .status.info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-        }
-        
-        .status.success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .badge {
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .badge-primary {
-            background-color: var(--primary-color);
-            color: white;
-        }
-        
-        .badge-success {
-            background-color: var(--secondary-color);
-            color: white;
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--primary-color);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            margin-right: 10px;
-            vertical-align: middle;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .progress-bar-container {
-            width: 100%;
-            background-color: #f3f3f3;
-            border-radius: 4px;
-            height: 10px;
-            margin-top: 5px;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            background-color: var(--primary-color);
-            border-radius: 4px;
-            width: 0%;
-            transition: width 0.3s;
-        }
-        
-        #serverStats {
-            font-size: 14px;
-            color: var(--gray-color);
-        }
-        
-        #clientId {
-            font-size: 12px;
-            color: var(--gray-color);
-        }
-        
-        .truncate {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 500px;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-        
-        .modal-content {
-            background-color: white;
-            margin: 15% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 60%;
-            max-width: 500px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .close:hover {
-            color: black;
-        }
-    </style>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <!-- Login Modal -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <div class="card login-container">
-                <h2>Register Client</h2>
-                <p>Register this device to synchronize files with other clients</p>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="clientName">Client Name:</label>
-                        <input type="text" id="clientName" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-success">Register Device</button>
-                </form>
-                <div id="loginStatus" class="status info hidden"></div>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4 max-w-6xl">
+        <!-- Client Registration Section -->
+        <div id="register-section" class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">Register Client</h2>
+            <p class="text-gray-600 mb-4">Register this device to synchronize files with other clients</p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex-1">
+                    <label for="client-name" class="block text-sm font-medium text-gray-700">Client Name:</label>
+                    <input id="client-name" type="text" placeholder="Enter client name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+                </div>
+                <button id="register-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-4 sm:mt-7">Register Device</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Main Application -->
-    <div id="appContainer" class="container hidden">
-        <div class="header">
-            <div>
-                <h1>Distributed File Sync System</h1>
-                <p id="clientId"></p>
-                <p id="serverStats"></p>
-            </div>
-            <div>
-                <button id="disconnectBtn" class="btn btn-danger">Disconnect</button>
-            </div>
+            <p id="register-status" class="mt-2 text-sm text-gray-600"></p>
         </div>
 
-        <div class="grid">
-            <!-- File List Panel -->
-            <div class="card">
-                <h2>Files <span id="fileCount" class="badge badge-primary">0</span></h2>
-                <p>Files synchronized across all connected devices</p>
-                <ul id="fileList" class="file-list">
-                    <li class="file-item">
-                        <div>
-                            <i class="fa-solid fa-spinner"></i> Loading files...
-                        </div>
-                    </li>
-                </ul>
-                <div class="file-upload">
-                    <h3>Upload File</h3>
-                    <form id="fileUploadForm">
-                        <div class="form-group">
-                            <label for="fileInput">Select File:</label>
-                            <input type="file" id="fileInput" class="form-control" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="filePath">Save Path (optional):</label>
-                            <input type="text" id="filePath" class="form-control" placeholder="e.g., folder/file.txt">
-                            <small>Leave empty to use the original filename</small>
-                        </div>
-                        <button type="submit" class="btn btn-success">Upload File</button>
-                    </form>
-                    <div id="uploadStatus" class="hidden">
-                        <div class="spinner"></div>
-                        <span id="uploadStatusText">Uploading...</span>
-                        <div class="progress-bar-container">
-                            <div id="uploadProgress" class="progress-bar"></div>
-                        </div>
+        <!-- Main Application Section (Hidden until registered) -->
+        <div id="app-section" class="hidden">
+            <!-- Header -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h1 class="text-3xl font-bold text-center">Distributed File Sync System</h1>
+                <div class="flex justify-between items-center mt-4">
+                    <div>
+                        <p id="client-info" class="text-sm text-gray-600">Client ID: Not registered</p>
+                        <p id="server-info" class="text-sm text-gray-600">Server: Not connected</p>
                     </div>
+                    <button id="disconnect-btn" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">Disconnect</button>
                 </div>
             </div>
 
-            <!-- Client List Panel -->
-            <div class="card">
-                <h2>Connected Clients <span id="clientCount" class="badge badge-primary">0</span></h2>
-                <p>Currently connected devices</p>
-                <ul id="clientList" class="client-list">
-                    <li class="client-item">
-                        <div>
-                            <i class="fa-solid fa-spinner"></i> Loading clients...
+            <!-- Files Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-bold mb-4">Files (<span id="file-count">0</span>)</h2>
+                <p class="text-gray-600 mb-4">Files synchronized across all connected devices</p>
+                <div id="files-list" class="space-y-2">
+                    <p class="text-gray-500">Loading files...</p>
+                </div>
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold mb-2">Upload File</h3>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <div class="flex-1">
+                            <label for="file-input" class="block text-sm font-medium text-gray-700">Select File:</label>
+                            <input id="file-input" type="file" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2">
                         </div>
-                    </li>
-                </ul>
+                        <div class="flex-1">
+                            <label for="file-path" class="block text-sm font-medium text-gray-700">Save Path (optional):</label>
+                            <input id="file-path" type="text" placeholder="Leave empty to use original filename" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+                        </div>
+                    </div>
+                    <button id="upload-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 mt-4">Upload File</button>
+                    <p id="upload-status" class="mt-2 text-sm text-gray-600"></p>
+                </div>
+            </div>
+
+            <!-- Connected Clients Section -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-bold mb-4">Connected Clients (<span id="client-count">0</span>)</h2>
+                <p class="text-gray-600 mb-4">Currently connected devices</p>
+                <div id="clients-list" class="space-y-2">
+                    <p class="text-gray-500">Loading clients...</p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Application State
-        const appState = {
-            clientId: null,
-            assignedPort: null,
-            serverAddress: null,
-            serverPort: null,
-            files: new Map(),
-            clients: new Map(),
-            ws: null,
-            heartbeatInterval: null
-        };
+        let ws = null;
+        let clientId = null;
+        let serverAddress = null;
+        let serverPort = null;
+        let clientName = null;
+        let files = [];
+        let clients = [];
 
-        // DOM Elements
-        const elements = {
-            loginModal: document.getElementById('loginModal'),
-            loginForm: document.getElementById('loginForm'),
-            loginStatus: document.getElementById('loginStatus'),
-            appContainer: document.getElementById('appContainer'),
-            clientId: document.getElementById('clientId'),
-            serverStats: document.getElementById('serverStats'),
-            disconnectBtn: document.getElementById('disconnectBtn'),
-            fileList: document.getElementById('fileList'),
-            fileCount: document.getElementById('fileCount'),
-            clientList: document.getElementById('clientList'),
-            clientCount: document.getElementById('clientCount'),
-            fileUploadForm: document.getElementById('fileUploadForm'),
-            fileInput: document.getElementById('fileInput'),
-            filePath: document.getElementById('filePath'),
-            uploadStatus: document.getElementById('uploadStatus'),
-            uploadStatusText: document.getElementById('uploadStatusText'),
-            uploadProgress: document.getElementById('uploadProgress')
-        };
+        const registerSection = document.getElementById('register-section');
+        const appSection = document.getElementById('app-section');
+        const registerBtn = document.getElementById('register-btn');
+        const clientNameInput = document.getElementById('client-name');
+        const registerStatus = document.getElementById('register-status');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const clientInfo = document.getElementById('client-info');
+        const serverInfo = document.getElementById('server-info');
+        const fileCount = document.getElementById('file-count');
+        const filesList = document.getElementById('files-list');
+        const clientCount = document.getElementById('client-count');
+        const clientsList = document.getElementById('clients-list');
+        const fileInput = document.getElementById('file-input');
+        const filePathInput = document.getElementById('file-path');
+        const uploadBtn = document.getElementById('upload-btn');
+        const uploadStatus = document.getElementById('upload-status');
 
-        // Show the login modal on load
-        window.addEventListener('DOMContentLoaded', () => {
-            showLoginModal();
-        });
-
-        // Login Form Submission
-        elements.loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const clientName = document.getElementById('clientName').value.trim();
-            
-            if (!clientName) {
-                showLoginStatus('Please enter a client name', 'error');
-                return;
-            }
-            
+        async function fetchInitialData() {
             try {
-                showLoginStatus('Registering client...', 'info');
-                
+                const [filesResponse, clientsResponse] = await Promise.all([
+                    fetch('/api/files'),
+                    fetch('/api/clients')
+                ]);
+                if (filesResponse.ok) {
+                    files = await filesResponse.json();
+                    console.log('Fetched initial files:', files);
+                    updateFilesList();
+                }
+                if (clientsResponse.ok) {
+                    clients = await clientsResponse.json();
+                    console.log('Fetched initial clients:', clients);
+                    updateClientsList();
+                }
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
+            }
+        }
+
+        // Register client
+        registerBtn.addEventListener('click', async () => {
+            clientName = clientNameInput.value.trim() || 'Anonymous';
+            registerStatus.textContent = 'Registering...';
+            try {
                 const response = await fetch('/api/register', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: clientName })
                 });
-                
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Registration failed');
+                    throw new Error(`Registration failed: ${response.statusText}`);
                 }
-                
                 const data = await response.json();
-                
-                // Save client information
-                appState.clientId = data.clientId;
-                appState.assignedPort = data.assignedPort;
-                appState.serverAddress = data.serverAddress;
-                appState.serverPort = data.serverPort;
-                
-                // Connect to WebSocket
-                await connectWebSocket();
-                
-                // Start heartbeat
-                startHeartbeat();
-                
-                // Hide login modal and show app
-                hideLoginModal();
-                showApp();
-                
-                // Update UI with client info
-                elements.clientId.textContent = `Client ID: ${appState.clientId} | Port: ${appState.assignedPort}`;
-                elements.serverStats.textContent = `Server: ${appState.serverAddress}:${appState.serverPort}`;
-                
-                // Load initial data
-                loadFiles();
-                loadClients();
-                
+                clientId = data.clientId;
+                serverAddress = data.serverAddress;
+                serverPort = data.serverPort;
+
+                // Initialize WebSocket
+                initWebSocket(data.clientId);
+                registerStatus.textContent = 'Registration successful!';
+                registerStatus.classList.add('text-green-500');
+                registerSection.classList.add('hidden');
+                appSection.classList.remove('hidden');
+                clientInfo.textContent = `Client ID: ${clientId} (${clientName})`;
+                serverInfo.textContent = `Server: ${serverAddress}:${serverPort}`;
+                fetchInitialData();
             } catch (error) {
-                showLoginStatus(`Error: ${error.message}`, 'error');
+                console.error('Registration error:', error);
+                registerStatus.textContent = `Error: ${error.message}`;
+                registerStatus.classList.add('text-red-500');
             }
         });
 
-        // Disconnect Button
-        elements.disconnectBtn.addEventListener('click', async () => {
-            try {
-                await disconnectClient();
-                showLoginModal();
-                hideApp();
-            } catch (error) {
-                console.error('Error disconnecting:', error);
+        // Initialize WebSocket connection
+        function initWebSocket(clientId) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                console.log('Closed existing WebSocket for client:', clientId);
             }
-        });
-
-        // File Upload Form
-        elements.fileUploadForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const file = elements.fileInput.files[0];
-            if (!file) {
-                alert('Please select a file to upload');
-                return;
-            }
-            
-            let uploadPath = elements.filePath.value.trim();
-            if (!uploadPath) {
-                uploadPath = file.name;
-            }
-            
-            // Normalize path (remove leading slash if present)
-            if (uploadPath.startsWith('/')) {
-                uploadPath = uploadPath.substring(1);
-            }
-            
-            try {
-                await uploadFile(file, uploadPath);
-                elements.fileUploadForm.reset();
-            } catch (error) {
-                console.error('Error uploading file:', error);
-                elements.uploadStatusText.textContent = `Upload failed: ${error.message}`;
-                elements.uploadStatus.classList.add('error');
-                
-                // Hide the upload status after 3 seconds
-                setTimeout(() => {
-                    elements.uploadStatus.classList.add('hidden');
-                }, 3000);
-            }
-        });
-
-        // Connect to WebSocket
-        async function connectWebSocket() {
-            return new Promise((resolve, reject) => {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}?clientId=${appState.clientId}`;
-                
-                appState.ws = new WebSocket(wsUrl);
-                
-                appState.ws.onopen = () => {
-                    console.log('WebSocket connection established');
-                    resolve();
-                };
-                
-                appState.ws.onclose = () => {
-                    console.log('WebSocket connection closed');
-                    clearInterval(appState.heartbeatInterval);
-                };
-                
-                appState.ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    reject(new Error('WebSocket connection failed'));
-                };
-                
-                appState.ws.onmessage = handleWebSocketMessage;
-            });
-        }
-
-        // Handle WebSocket Messages
-        function handleWebSocketMessage(event) {
-            try {
-                const message = JSON.parse(event.data);
-                
-                switch (message.type) {
-                    case 'init':
-                        // Initialize with files and clients
-                        message.files.forEach(file => {
-                            appState.files.set(file.path, file);
-                        });
-                        
-                        message.clients.forEach(client => {
-                            appState.clients.set(client.id, client);
-                        });
-                        
-                        updateFileList();
-                        updateClientList();
-                        break;
-                    
-                    case 'file_change':
-                        handleFileChange(message);
-                        break;
-                    
-                    case 'client_event':
-                        handleClientEvent(message);
-                        break;
-                    
-                    case 'file_data':
-                        // Handle file data if needed
-                        break;
-                        
-                    default:
-                        console.log('Unknown message type:', message.type);
-                }
-            } catch (error) {
-                console.error('Error processing WebSocket message:', error);
-            }
-        }
-
-        // Handle File Changes
-        function handleFileChange(message) {
-            if (message.type === 'update') {
-                appState.files.set(message.file.path, message.file);
-            } else if (message.type === 'delete') {
-                appState.files.delete(message.path);
-            }
-            
-            updateFileList();
-        }
-
-        // Handle Client Events
-        function handleClientEvent(message) {
-            if (message.type === 'client_connected') {
-                // Load updated client list
-                loadClients();
-            } else if (message.type === 'client_disconnected') {
-                // Remove disconnected client
-                appState.clients.delete(message.clientId);
-                updateClientList();
-            }
-        }
-
-        // Start Heartbeat
-        function startHeartbeat() {
-            // Send heartbeat every 30 seconds
-            appState.heartbeatInterval = setInterval(async () => {
-                try {
-                    await fetch('/api/heartbeat', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ clientId: appState.clientId })
-                    });
-                } catch (error) {
-                    console.error('Heartbeat error:', error);
-                }
-            }, 30000);
-        }
-
-        // Load Files
-        async function loadFiles() {
-            try {
-                const response = await fetch('/api/files');
-                if (!response.ok) {
-                    throw new Error('Failed to load files');
-                }
-                
-                const files = await response.json();
-                
-                // Clear existing files and add new ones
-                appState.files.clear();
-                files.forEach(file => {
-                    appState.files.set(file.path, file);
-                });
-                
-                updateFileList();
-            } catch (error) {
-                console.error('Error loading files:', error);
-            }
-        }
-
-        // Load Clients
-        async function loadClients() {
-            try {
-                const response = await fetch('/api/clients');
-                if (!response.ok) {
-                    throw new Error('Failed to load clients');
-                }
-                
-                const clients = await response.json();
-                
-                // Clear existing clients and add new ones
-                appState.clients.clear();
-                clients.forEach(client => {
-                    appState.clients.set(client.id, client);
-                });
-                
-                updateClientList();
-            } catch (error) {
-                console.error('Error loading clients:', error);
-            }
-        }
-
-        // Update File List UI
-        function updateFileList() {
-            elements.fileList.innerHTML = '';
-            elements.fileCount.textContent = appState.files.size;
-            
-            if (appState.files.size === 0) {
-                elements.fileList.innerHTML = `
-                    <li class="file-item">
-                        <div>No files available</div>
-                    </li>
-                `;
-                return;
-            }
-            
-            // Sort files by path
-            const sortedFiles = Array.from(appState.files.values()).sort((a, b) => {
-                return a.path.localeCompare(b.path);
-            });
-            
-            sortedFiles.forEach(file => {
-                const fileItem = document.createElement('li');
-                fileItem.className = 'file-item';
-                
-                // Determine file icon based on extension
-                const extension = file.path.split('.').pop().toLowerCase();
-                let iconClass = 'fa-solid fa-file';
-                
-                if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(extension)) {
-                    iconClass = 'fa-solid fa-file-image';
-                } else if (['pdf'].includes(extension)) {
-                    iconClass = 'fa-solid fa-file-pdf';
-                } else if (['doc', 'docx', 'txt', 'md'].includes(extension)) {
-                    iconClass = 'fa-solid fa-file-lines';
-                } else if (['xls', 'xlsx', 'csv'].includes(extension)) {
-                    iconClass = 'fa-solid fa-file-excel';
-                } else if (['js', 'html', 'css', 'py', 'java', 'php'].includes(extension)) {
-                    iconClass = 'fa-solid fa-file-code';
-                } else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(extension)) {
-                    iconClass = 'fa-solid fa-file-zipper';
-                }
-                
-                // Format file size
-                const formattedSize = formatFileSize(file.size);
-                
-                // Format last modified date
-                const formattedDate = new Date(file.lastModified).toLocaleString();
-                
-                fileItem.innerHTML = `
-                    <div>
-                        <i class="${iconClass} file-icon"></i>
-                        <span class="truncate">${file.path}</span>
-                        <div class="client-details">
-                            ${formattedSize} | Last Modified: ${formattedDate} | Uploaded by: ${file.uploadedBy === appState.clientId ? 'You' : file.uploadedBy.substring(0, 8) + '...'}
-                        </div>
-                    </div>
-                    <div class="file-actions">
-                        <button class="btn btn-sm" onclick="downloadFile('${file.path}')">
-                            <i class="fa-solid fa-download"></i> Download
-                        </button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
-                            <i class="fa-solid fa-trash"></i> Delete
-                        </button>
-                    </div>
-                `;
-                
-                elements.fileList.appendChild(fileItem);
-            });
-        }
-
-        // Update Client List UI
-        function updateClientList() {
-            elements.clientList.innerHTML = '';
-            elements.clientCount.textContent = appState.clients.size;
-            
-            if (appState.clients.size === 0) {
-                elements.clientList.innerHTML = `
-                    <li class="client-item">
-                        <div>No clients connected</div>
-                    </li>
-                `;
-                return;
-            }
-            
-            appState.clients.forEach(client => {
-                const clientItem = document.createElement('li');
-                clientItem.className = 'client-item';
-                
-                const isCurrentClient = client.id === appState.clientId;
-                const clientName = isCurrentClient ? `${client.name} (You)` : client.name;
-                
-                clientItem.innerHTML = `
-                    <div class="client-name">
-                        <i class="fa-solid fa-desktop"></i> ${clientName}
-                    </div>
-                    <div class="client-details">
-                        ID: ${client.id.substring(0, 8)}... | IP: ${client.ipAddress} | Port: ${client.port}
-                    </div>
-                `;
-                
-                elements.clientList.appendChild(clientItem);
-            });
-        }
-
-        // Upload File
-        async function uploadFile(file, path) {
-            // Show upload status
-            elements.uploadStatus.classList.remove('hidden', 'error');
-            elements.uploadStatusText.textContent = 'Uploading...';
-            elements.uploadProgress.style.width = '0%';
-            
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                
-                reader.onload = async (event) => {
-                    try {
-                        const fileData = event.target.result;
-                        
-                        // Create a Blob from the file data
-                        const blob = new Blob([fileData]);
-                        
-                        // Create URL parameter
-                        const url = `/api/files/upload?path=${encodeURIComponent(path)}&clientId=${appState.clientId}`;
-                        
-                        // Use XMLHttpRequest to track upload progress
-                        const xhr = new XMLHttpRequest();
-                        
-                        xhr.open('POST', url, true);
-                        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-                        
-                        // Track upload progress
-                        xhr.upload.onprogress = (e) => {
-                            if (e.lengthComputable) {
-                                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                                elements.uploadProgress.style.width = `${percentComplete}%`;
-                                elements.uploadStatusText.textContent = `Uploading... ${percentComplete}%`;
-                            }
-                        };
-                        
-                        xhr.onload = () => {
-                            if (xhr.status >= 200 && xhr.status < 300) {
-                                elements.uploadStatusText.textContent = 'Upload complete!';
-                                elements.uploadStatus.classList.add('success');
-                                
-                                // Hide the upload status after 3 seconds
-                                setTimeout(() => {
-                                    elements.uploadStatus.classList.add('hidden');
-                                }, 3000);
-                                
-                                resolve();
-                            } else {
-                                const error = JSON.parse(xhr.responseText);
-                                reject(new Error(error.error || 'Upload failed'));
-                            }
-                        };
-                        
-                        xhr.onerror = () => {
-                            reject(new Error('Network error during upload'));
-                        };
-                        
-                        xhr.send(blob);
-                        
-                    } catch (error) {
-                        reject(error);
+            const uniqueId = Date.now() + '-' + Math.random().toString(36).substring(2);
+            const wsUrl = `ws://${window.location.hostname}:${serverPort}?clientId=${clientId}&uniqueId=${uniqueId}`;
+            console.log('Connecting to WebSocket:', wsUrl);
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                console.log('WebSocket connected for client:', clientId, 'state:', ws.readyState);
+                setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'heartbeat' }));
+                        console.log('Sent heartbeat for client:', clientId);
                     }
-                };
-                
-                reader.onerror = () => {
-                    reject(new Error('Error reading file'));
-                };
-                
-                reader.readAsArrayBuffer(file);
-            });
+                }, 30000);
+            };
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Received WebSocket message:', JSON.stringify(data, null, 2));
+                    handleWebSocketMessage(data);
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error, 'raw data:', event.data);
+                }
+            };
+            ws.onclose = () => {
+                console.log('WebSocket closed for client:', clientId);
+                setTimeout(() => initWebSocket(clientId), 5000);
+            };
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                registerStatus.textContent = 'WebSocket connection error';
+                registerStatus.classList.add('text-red-500');
+            };
         }
 
-        // Download File
-        function downloadFile(filePath) {
-            // Create a link to download the file
-            const downloadUrl = `/sync/${filePath}`;
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = filePath.split('/').pop(); // Use the filename part
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // Delete File
-        async function deleteFile(filePath) {
-            if (!confirm(`Are you sure you want to delete "${filePath}"? This cannot be undone.`)) {
+        // Handle WebSocket messages
+        function handleWebSocketMessage(data) {
+            if (!data || !data.type) {
+                console.warn('Invalid WebSocket message:', data);
                 return;
             }
-            
-            try {
-                const response = await fetch(`/api/files?path=${encodeURIComponent(filePath)}&clientId=${appState.clientId}`, {
-                    method: 'DELETE'
-                });
-                
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to delete file');
-                }
-                
-                // The file will be removed from the UI when the server sends the delete notification
-            } catch (error) {
-                console.error('Error deleting file:', error);
-                alert(`Error deleting file: ${error.message}`);
+            console.log('Processing message type:', data.type);
+            switch (data.type) {
+                case 'init':
+                    console.log('Before init - Files:', files.length, 'Clients:', clients.length);
+                    files = data.files || [];
+                    clients = data.clients || [];
+                    console.log('After init - Files:', files.length, 'Clients:', clients.length);
+                    updateFilesList();
+                    updateClientsList();
+                    break;
+                case 'change':
+                    console.log('File change event:', data);
+                    if (data.eventType === 'update' && data.file && data.file.path) {
+                        console.log('Before file update - Files:', files.length);
+                        const index = files.findIndex(f => f.path === data.file.path);
+                        if (index >= 0) {
+                            files[index] = data.file;
+                        } else {
+                            files.push(data.file);
+                        }
+                        console.log('After file update - Files:', files.length);
+                        updateFilesList();
+                    } else if (data.eventType === 'delete' && data.path) {
+                        console.log('Before file delete - Files:', files.length);
+                        files = files.filter(f => f.path !== data.path);
+                        console.log('After file delete - Files:', files.length);
+                        updateFilesList();
+                    } else {
+                        console.warn('Invalid change message:', data);
+                    }
+                    break;
+                case 'client':
+                    console.log('Client event:', data);
+                    if ((data.eventType === 'client_connected' || data.eventType === 'client_registered') && data.client && data.client.id) {
+                        console.log('Before client update - Clients:', clients.length);
+                        const index = clients.findIndex(c => c.id === data.client.id);
+                        if (index >= 0) {
+                            clients[index] = data.client;
+                        } else {
+                            clients.push(data.client);
+                        }
+                        console.log('After client update - Clients:', clients.length);
+                        updateClientsList();
+                    } else if (data.eventType === 'client_disconnected' && data.clientId) {
+                        console.log('Before client delete - Clients:', clients.length);
+                        clients = clients.filter(c => c.id !== data.clientId);
+                        console.log('After client delete - Clients:', clients.length);
+                        updateClientsList();
+                    } else {
+                        console.warn('Invalid client message:', data);
+                    }
+                    break;
+                case 'heartbeat_ack':
+                    console.log('Heartbeat acknowledged:', data.timestamp);
+                    break;
+                default:
+                    console.warn('Unknown message type:', data.type);
             }
         }
 
-        // Disconnect Client
-        async function disconnectClient() {
-            try {
-                // Close WebSocket
-                if (appState.ws) {
-                    appState.ws.close();
+        // Update files list
+        function updateFilesList() {
+            console.log('Updating files list with:', files);
+            filesList.innerHTML = '';
+            if (files.length === 0) {
+                filesList.innerHTML = '<p class="text-gray-500">No files available</p>';
+                fileCount.textContent = '0';
+                return;
+            }
+            files.forEach(file => {
+                if (!file || !file.path) {
+                    console.warn('Invalid file object:', file);
+                    return;
                 }
-                
-                // Clear heartbeat interval
-                clearInterval(appState.heartbeatInterval);
-                
-                // Send disconnect request to server
-                await fetch('/api/disconnect', {
+                const fileElement = document.createElement('div');
+                fileElement.className = 'border-b py-2 flex justify-between';
+                fileElement.dataset.path = file.path;
+                fileElement.innerHTML = `
+                    <div>
+                        <span class="font-medium">${file.path}</span>
+                        <span class="text-sm text-gray-500">(${formatSize(file.size)})</span>
+                        <span class="text-sm text-gray-500">by ${file.uploaderName || 'Unknown'}</span>
+                    </div>
+                    <a href="/sync/${encodeURIComponent(file.path)}" download class="text-blue-500 hover:underline">Download</a>
+                `;
+                filesList.appendChild(fileElement);
+            });
+            fileCount.textContent = files.length;
+            console.log('Files list updated, DOM elements:', filesList.children.length);
+        }
+
+        // Update clients list
+        function updateClientsList() {
+            console.log('Updating clients list with:', clients);
+            clientsList.innerHTML = '';
+            if (clients.length === 0) {
+                clientsList.innerHTML = '<p class="text-gray-500">No clients connected</p>';
+                clientCount.textContent = '0';
+                return;
+            }
+            clients.forEach(client => {
+                if (!client || !client.id) {
+                    console.warn('Invalid client object:', client);
+                    return;
+                }
+                const clientElement = document.createElement('div');
+                clientElement.className = 'border-b py-2';
+                clientElement.dataset.id = client.id;
+                clientElement.innerHTML = `
+                    <span class="font-medium">${client.name || 'Unknown'}</span>
+                    <span class="text-sm text-gray-500">(${client.ipAddress}:${client.port})</span>
+                `;
+                clientsList.appendChild(clientElement);
+            });
+            clientCount.textContent = clients.length;
+            console.log('Clients list updated, DOM elements:', clientsList.children.length);
+        }
+
+        // File upload
+        uploadBtn.addEventListener('click', async () => {
+            if (!fileInput.files.length) {
+                uploadStatus.textContent = 'Please select a file';
+                uploadStatus.classList.add('text-red-500');
+                return;
+            }
+            const file = fileInput.files[0];
+            const savePath = filePathInput.value.trim() || file.name;
+            uploadStatus.textContent = 'Uploading...';
+            try {
+                const response = await fetch(`/api/files/upload?path=${encodeURIComponent(savePath)}&clientId=${clientId}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ clientId: appState.clientId })
+                    headers: { 'Content-Type': file.type },
+                    body: file
                 });
-                
-                // Clear application state
-                appState.clientId = null;
-                appState.assignedPort = null;
-                appState.files.clear();
-                appState.clients.clear();
-                appState.ws = null;
-                
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+                const fileInfo = await response.json();
+                console.log('File uploaded:', fileInfo);
+                const index = files.findIndex(f => f.path === fileInfo.path);
+                if (index >= 0) {
+                    files[index] = fileInfo;
+                } else {
+                    files.push(fileInfo);
+                }
+                updateFilesList();
+                uploadStatus.textContent = 'File uploaded successfully! Awaiting sync...';
+                uploadStatus.classList.remove('text-red-500');
+                uploadStatus.classList.add('text-green-500');
+                fileInput.value = '';
+                filePathInput.value = '';
             } catch (error) {
-                console.error('Error disconnecting:', error);
-                throw error;
+                console.error('Upload error:', error);
+                uploadStatus.textContent = `Error: ${error.message}`;
+                uploadStatus.classList.add('text-red-500');
             }
+        });
+
+        // Disconnect client
+        disconnectBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/disconnect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientId })
+                });
+                if (!response.ok) {
+                    throw new Error('Disconnection failed');
+                }
+                handleDisconnect();
+            } catch (error) {
+                console.error('Disconnect error:', error);
+                registerStatus.textContent = `Error: ${error.message}`;
+                registerStatus.classList.add('text-red-500');
+            }
+        });
+
+        function handleDisconnect() {
+            if (ws) {
+                ws.close();
+            }
+            registerSection.classList.remove('hidden');
+            appSection.classList.add('hidden');
+            registerStatus.textContent = 'Disconnected. Please register again.';
+            registerStatus.classList.remove('text-green-500');
+            clientId = null;
+            serverAddress = null;
+            serverPort = null;
+            clientName = null;
+            files = [];
+            clients = [];
+            updateFilesList();
+            updateClientsList();
         }
 
-        // Show Login Modal
-        function showLoginModal() {
-            elements.loginModal.style.display = 'block';
-            document.getElementById('clientName').focus();
-        }
-
-        // Hide Login Modal
-        function hideLoginModal() {
-            elements.loginModal.style.display = 'none';
-            elements.loginStatus.classList.add('hidden');
-        }
-
-        // Show App
-        function showApp() {
-            elements.appContainer.classList.remove('hidden');
-        }
-
-        // Hide App
-        function hideApp() {
-            elements.appContainer.classList.add('hidden');
-        }
-
-        // Show Login Status Message
-        function showLoginStatus(message, type) {
-            elements.loginStatus.textContent = message;
-            elements.loginStatus.className = `status ${type}`;
-            elements.loginStatus.classList.remove('hidden');
-        }
-
-        // Format File Size
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
             const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
-
-        // Global error handler
-        window.addEventListener('error', (event) => {
-            console.error('Global error:', event.error);
-            alert(`An error occurred: ${event.error.message}`);
-        });
-
-        // Handle page unload
-        window.addEventListener('beforeunload', async (e) => {
-            // Only disconnect if logged in
-            if (appState.clientId) {
-                try {
-                    await disconnectClient();
-                } catch (error) {
-                    console.error('Error during disconnect:', error);
-                }
-            }
-        });
-
-        // Add global access to some functions for button onclick handlers
-        window.downloadFile = downloadFile;
-        window.deleteFile = deleteFile;
     </script>
 </body>
 </html>

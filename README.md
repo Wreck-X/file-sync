@@ -65,7 +65,7 @@ The server will begin listening on the configured port (default: 3000) and will 
 
 Once the server is running, you can access the web client by opening a browser and navigating to:
 
-```
+```http
 http://localhost:3000
 ```
 
@@ -75,7 +75,7 @@ The system provides a RESTful API for file operations:
 
 ### Get File List
 
-```
+```http
 GET /api/files
 ```
 
@@ -83,7 +83,7 @@ Returns a JSON array of all files in the sync directory, including metadata.
 
 ### Upload File
 
-```
+```http
 POST /api/files/upload?path={filePath}
 ```
 
@@ -91,7 +91,7 @@ Uploads a file to the specified path. The request body should contain the file c
 
 ### Delete File
 
-```
+```http
 DELETE /api/files?path={filePath}
 ```
 
@@ -101,13 +101,13 @@ Deletes the file at the specified path.
 
 The system uses WebSockets for real-time updates. The main message types are:
 
-### Server to Client:
+### Server to Client
 
 - `init`: Initial data with file list
 - `file_change`: Notification of file changes (create, update, delete)
 - `file_data`: File content transfer
 
-### Client to Server:
+### Client to Server
 
 - `sync_request`: Request for file synchronization
 - `file_change`: Notification of client-side file changes
@@ -155,6 +155,7 @@ This system can be extended in several ways:
 ### Connection Issues
 
 If the client cannot connect to the server:
+
 - Check that the server is running
 - Verify network connectivity
 - Ensure no firewalls are blocking the connection
@@ -162,6 +163,7 @@ If the client cannot connect to the server:
 ### File Synchronization Issues
 
 If files are not synchronizing properly:
+
 - Check the activity logs in the client interface
 - Verify file system permissions
 - Restart the server and refresh the client

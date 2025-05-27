@@ -11,14 +11,13 @@ const chokidar = require('chokidar');
 const crypto = require('crypto');
 const ip = require('ip');
 
-// Configuration
 const config = {
     port: process.env.PORT || 3000,
     syncDirectory: path.join(__dirname, 'sync_dir'),
-    clientId: crypto.randomUUID(), // Unique identifier for this server instance
-    maxClients: 50, // Maximum number of clients allowed
-    startPort: 3001, // Starting port for client assignment
-    endPort: 3050, // Ending port for client assignment
+    clientId: crypto.randomUUID(),
+    maxClients: 50,
+    startPort: 3001,
+    endPort: 3050,
 };
 
 // Ensure sync directory exists
@@ -29,12 +28,12 @@ const app = express();
 const server = http.createServer(app);
 
 // File metadata database (in-memory for demo)
-// In a production system, this would be a persistent database
 const fileDatabase = new Map();
 
 // Client management system
 const activeClients = new Map(); // Maps clientId to client info
 const portAssignments = new Map(); // Maps port numbers to client IDs
+const activeConnections = new Map(); // NEW: Maps clientId to WebSocket connection
 
 // WebSocket server for real-time updates
 const wss = new WebSocket.Server({ server });
@@ -56,6 +55,7 @@ app.get('/api/files', (req, res) => {
 app.get('/api/clients', (req, res) => {
     const clients = Array.from(activeClients.values()).map(client => ({
         id: client.id,
+        name: client.name,
         ipAddress: client.ipAddress,
         port: client.port,
         connectedAt: client.connectedAt,
@@ -67,8 +67,8 @@ app.get('/api/clients', (req, res) => {
 // Register as a new client and get port assignment
 app.post('/api/register', (req, res) => {
     const requestedName = req.body.name || 'Anonymous';
-    const remoteAddress = req.ip || req.connection.remoteAddress;
-    const parsedIp = remoteAddress.replace(/^::ffff:/, ''); // Handle IPv4 mapped to IPv6
+    const remoteAddress = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+    const parsedIp = remoteAddress ? remoteAddress.replace(/^::ffff:/, '') : 'unknown';
     
     // Generate a new client ID
     const newClientId = crypto.randomUUID();
@@ -103,7 +103,17 @@ app.post('/api/register', (req, res) => {
     
     console.log(`Registered new client: ${requestedName} (${newClientId}) at port ${assignedPort}`);
     
-    // Return the client info including their assigned port
+    // Broadcast new client registration
+    broadcastClientEvent({
+        eventType: 'client_registered',
+        client: {
+            id: clientInfo.id,
+            name: clientInfo.name,
+            ipAddress: clientInfo.ipAddress,
+            port: clientInfo.port
+        }
+    });
+    
     res.status(201).json({
         clientId: newClientId,
         assignedPort: assignedPort,
@@ -121,7 +131,7 @@ app.post('/api/files/upload', express.raw({ limit: '100mb', type: '*/*' }), asyn
         return res.status(400).json({ error: 'File path is required' });
     }
 
-    // Update client's last active timestamp if it exists
+    // Update client's last active timestamp
     if (activeClients.has(clientId)) {
         const client = activeClients.get(clientId);
         client.lastActive = new Date();
@@ -136,19 +146,22 @@ app.post('/api/files/upload', express.raw({ limit: '100mb', type: '*/*' }), asyn
         const stats = await fs.stat(fullPath);
         const fileHash = crypto.createHash('md5').update(req.body).digest('hex');
         
+        const uploaderName = activeClients.has(clientId) ? activeClients.get(clientId).name : 'Unknown';
+        
         const fileInfo = {
             path: filePath,
             size: stats.size,
             lastModified: stats.mtime,
             hash: fileHash,
-            uploadedBy: clientId
+            uploadedBy: clientId,
+            uploaderName: uploaderName
         };
         
         fileDatabase.set(filePath, fileInfo);
         
-        // Broadcast the file change to other clients
+        // Broadcast the file change
         broadcastFileChange({
-            type: 'update',
+            eventType: 'update',
             source: clientId,
             file: fileInfo
         });
@@ -169,7 +182,7 @@ app.delete('/api/files', async (req, res) => {
         return res.status(400).json({ error: 'File path is required' });
     }
     
-    // Update client's last active timestamp if it exists
+    // Update client's last active timestamp
     if (activeClients.has(clientId)) {
         const client = activeClients.get(clientId);
         client.lastActive = new Date();
@@ -181,9 +194,9 @@ app.delete('/api/files', async (req, res) => {
         await fs.remove(fullPath);
         fileDatabase.delete(filePath);
         
-        // Broadcast the file deletion to other clients
+        // Broadcast the file deletion
         broadcastFileChange({
-            type: 'delete',
+            eventType: 'delete',
             source: clientId,
             path: filePath
         });
@@ -195,7 +208,7 @@ app.delete('/api/files', async (req, res) => {
     }
 });
 
-// Heartbeat endpoint for clients to maintain their active status
+// Heartbeat endpoint
 app.post('/api/heartbeat', (req, res) => {
     const clientId = req.body.clientId;
     
@@ -223,15 +236,16 @@ app.post('/api/disconnect', (req, res) => {
     
     const client = activeClients.get(clientId);
     
-    // Free up the port assignment
+    // Free up resources
     portAssignments.delete(client.port);
     activeClients.delete(clientId);
+    activeConnections.delete(clientId);
     
     console.log(`Client disconnected: ${client.name} (${clientId}) from port ${client.port}`);
     
-    // Broadcast client disconnection to all clients
+    // Broadcast disconnection
     broadcastClientEvent({
-        type: 'client_disconnected',
+        eventType: 'client_disconnected',
         clientId: clientId,
         clientName: client.name
     });
@@ -241,36 +255,44 @@ app.post('/api/disconnect', (req, res) => {
 
 // WebSocket connection handling
 wss.on('connection', (ws, req) => {
-    let clientId = null;
+    // Extract client ID from URL
+    const urlParams = new URLSearchParams(req.url.replace(/^\/|\?.*$/, ''));
+    const clientId = urlParams.get('clientId');
     
-    // Extract client ID from URL if present
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    clientId = url.searchParams.get('clientId');
-    
-    console.log(`WebSocket connection from ${req.socket.remoteAddress}, clientId: ${clientId || 'unknown'}`);
-    
-    // Store client ID and websocket in the socket for easy reference
-    ws.clientId = clientId;
-    
-    // Update client's last active timestamp if it exists
-    if (clientId && activeClients.has(clientId)) {
-        const client = activeClients.get(clientId);
-        client.lastActive = new Date();
-        client.ws = ws; // Store the WebSocket connection
-        activeClients.set(clientId, client);
-        
-        // Broadcast client connection to all clients
-        broadcastClientEvent({
-            type: 'client_connected',
-            clientId: clientId,
-            clientName: client.name
-        });
+    if (!clientId || !activeClients.has(clientId)) {
+        console.log(`Invalid WebSocket connection attempt: clientId ${clientId || 'missing'}`);
+        ws.close(1008, 'Invalid client ID');
+        return;
     }
     
-    // Send initial file list to new client
+    console.log(`WebSocket connection from ${req.socket.remoteAddress}, clientId: ${clientId}, active connections: ${wss.clients.size}`);
+    
+    // Store connection
+    ws.clientId = clientId;
+    activeConnections.set(clientId, ws);
+    
+    // Update client info
+    if (activeClients.has(clientId)) {
+        const client = activeClients.get(clientId);
+        client.lastActive = new Date();
+        activeClients.set(clientId, client);
+        
+        // Broadcast client connection
+        broadcastClientEvent({
+            eventType: 'client_connected',
+            client: {
+                id: client.id,
+                name: client.name,
+                ipAddress: client.ipAddress,
+                port: client.port
+            }
+        }, clientId);
+    }
+    
+    // Send initial data
     ws.send(JSON.stringify({
         type: 'init',
-        clientId: clientId,
+        clientId,
         files: Array.from(fileDatabase.values()),
         clients: Array.from(activeClients.values()).map(client => ({
             id: client.id,
@@ -282,49 +304,49 @@ wss.on('connection', (ws, req) => {
     
     ws.on('message', (message) => {
         try {
-            const data = JSON.parse(message);
-            
-            // Update client's last active timestamp
-            if (clientId && activeClients.has(clientId)) {
-                const client = activeClients.get(clientId);
-                client.lastActive = new Date();
-                activeClients.set(clientId, client);
+            const data = JSON.parse(message.toString());
+            if (data.type === 'heartbeat') {
+                ws.send(JSON.stringify({ type: 'heartbeat_ack', timestamp: Date.now() }));
+                if (clientId && activeClients.has(clientId)) {
+                    const client = activeClients.get(clientId);
+                    client.lastActive = Date.now();
+                    activeClients.set(clientId, client);
+                }
             }
-            
-            handleClientMessage(data, ws, clientId);
-        } catch (err) {
-            console.error('Error processing message:', err);
+            handleClientMessage(data, ws);
+        } catch (error) {
+            console.error(`Error processing message for client ${clientId}:`, error);
         }
     });
     
     ws.on('close', () => {
-        console.log(`WebSocket closed for client: ${clientId || 'unknown'}`);
-        
-        // Do not remove from active clients here
-        // Client will explicitly disconnect via API
+        console.log(`WebSocket closed for clientId: ${clientId}`);
+        activeConnections.delete(clientId);
+    });
+    
+    ws.on('error', (error) => {
+        console.error(`WebSocket error for client ${clientId}:`, error);
+        activeConnections.delete(clientId);
     });
 });
 
 // Handle incoming client messages
-function handleClientMessage(message, ws, clientId) {
+function handleClientMessage(message, ws) {
     switch (message.type) {
         case 'sync_request':
-            // Client requests specific file
             sendFileToClient(message.path, ws);
             break;
-        
+        case 'change':
         case 'file_change':
-            // Only process if from a different source
+            if (message.type === 'file_change') {
+                console.warn(`Received legacy 'file_change' message from client, should use 'change':`, message);
+            }
             if (message.source !== config.clientId) {
                 processRemoteFileChange(message);
             }
             break;
-            
         case 'heartbeat':
-            // Client heartbeat
-            // Already handled in the message listener
             break;
-            
         default:
             console.log('Unknown message type:', message.type);
     }
@@ -341,22 +363,18 @@ async function sendFileToClient(filePath, ws) {
             data: data.toString('base64')
         }));
     } catch (err) {
-        console.error('Error sending file to client:', err);
+        console.error('Error sending file:', err);
     }
 }
 
 // Process remote file changes
 async function processRemoteFileChange(change) {
-    if (change.type === 'update') {
+    if (change.eventType === 'update') {
         const fileInfo = change.file;
         fileDatabase.set(fileInfo.path, fileInfo);
-        
-        // Actual file data would be downloaded separately as needed
         console.log(`Remote file updated: ${fileInfo.path}`);
-    } else if (change.type === 'delete') {
+    } else if (change.eventType === 'delete') {
         fileDatabase.delete(change.path);
-        
-        // Remove local file
         const fullPath = path.join(config.syncDirectory, change.path);
         try {
             await fs.remove(fullPath);
@@ -370,59 +388,69 @@ async function processRemoteFileChange(change) {
 // Broadcast file changes to all connected clients
 function broadcastFileChange(change) {
     const message = JSON.stringify({
-        type: 'file_change',
-        ...change
+        type: 'change',
+        eventType: change.eventType,
+        source: change.source,
+        file: change.file,
+        path: change.path
     });
-    
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
+    let clientCount = 0;
+    const sentTo = [];
+    activeConnections.forEach((ws, clientId) => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(message);
+            clientCount++;
+            sentTo.push(clientId);
         }
     });
+    console.log(`Broadcasting file change to ${clientCount} clients, sent to: ${sentTo.join(', ')}`, change);
 }
 
-// Broadcast client events (connect/disconnect) to all connected clients
-function broadcastClientEvent(event) {
+// Broadcast client events to all connected clients
+function broadcastClientEvent(event, excludeClientId = null) {
     const message = JSON.stringify({
-        type: 'client_event',
-        ...event
+        type: 'client',
+        eventType: event.eventType,
+        client: event.client,
+        clientId: event.clientId,
+        clientName: event.clientName
     });
-    
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
+    let clientCount = 0;
+    const sentTo = [];
+    activeConnections.forEach((ws, clientId) => {
+        if (ws.readyState === WebSocket.OPEN && clientId !== excludeClientId) {
+            ws.send(message);
+            clientCount++;
+            sentTo.push(clientId);
         }
     });
+    console.log(`Broadcasting client event to ${clientCount} clients: ${JSON.stringify(event.eventType)}`, `sent to: ${sentTo.join(', ')}`);
 }
 
 // Periodically check for inactive clients
 setInterval(() => {
     const now = new Date();
-    const inactiveThreshold = 5 * 60 * 1000; // 5 minutes
+    const inactiveThreshold = 300000;
     
     activeClients.forEach((client, clientId) => {
-        const lastActive = client.lastActive;
-        if ((now - lastActive) > inactiveThreshold) {
+        if ((now - client.lastActive) > inactiveThreshold) {
             console.log(`Client inactive, removing: ${client.name} (${clientId})`);
-            
-            // Free up the port assignment
             portAssignments.delete(client.port);
             activeClients.delete(clientId);
-            
-            // Broadcast client disconnection
+            activeConnections.delete(clientId);
             broadcastClientEvent({
-                type: 'client_disconnected',
+                eventType: 'client_disconnected',
                 clientId: clientId,
                 clientName: client.name,
                 reason: 'timeout'
             });
         }
     });
-}, 60 * 1000); // Check every minute
+}, 60000);
 
-// File system watcher to detect local changes
+// File system watcher
 const watcher = chokidar.watch(config.syncDirectory, {
-    ignored: /(^|[\/\\])\../, // ignore dotfiles
+    ignored: /(^|[\/\\])\../,
     persistent: true,
     ignoreInitial: true,
     awaitWriteFinish: true
@@ -451,21 +479,17 @@ async function handleFileChanged(filePath) {
             size: stats.size,
             lastModified: stats.mtime,
             hash: fileHash,
-            uploadedBy: config.clientId
+            uploadedBy: config.clientId,
+            uploaderName: 'Server'
         };
         
-        // Check if this is a new version
-        const existingFile = fileDatabase.get(relativePath);
-        if (!existingFile || existingFile.hash !== fileInfo.hash) {
+        if (!fileDatabase.get(relativePath) || fileDatabase.get(relativePath).hash !== fileInfo.hash) {
             fileDatabase.set(relativePath, fileInfo);
-            
-            // Broadcast file change to all clients
             broadcastFileChange({
-                type: 'update',
+                eventType: 'update',
                 source: config.clientId,
                 file: fileInfo
             });
-            
             console.log(`Local file changed: ${relativePath}`);
         }
     } catch (err) {
@@ -478,14 +502,11 @@ function handleFileDeleted(filePath) {
     try {
         const relativePath = path.relative(config.syncDirectory, filePath);
         fileDatabase.delete(relativePath);
-        
-        // Broadcast file deletion to all clients
         broadcastFileChange({
-            type: 'delete',
+            eventType: 'delete',
             source: config.clientId,
             path: relativePath
         });
-        
         console.log(`Local file deleted: ${relativePath}`);
     } catch (err) {
         console.error('Error processing file deletion:', err);
@@ -511,7 +532,8 @@ async function scanExistingFiles() {
                     size: stats.size,
                     lastModified: stats.mtime,
                     hash: fileHash,
-                    uploadedBy: config.clientId
+                    uploadedBy: config.clientId,
+                    uploaderName: 'Server'
                 });
             }
         }
@@ -526,7 +548,6 @@ async function scanExistingFiles() {
 async function init() {
     await scanExistingFiles();
     
-    // Display server information
     const serverIp = ip.address();
     
     server.listen(config.port, '0.0.0.0', () => {
@@ -538,7 +559,7 @@ async function init() {
     });
 }
 
-// Add graceful shutdown handling
+// Graceful shutdown
 process.on('SIGINT', () => {
     console.log('Shutting down server...');
     server.close(() => {
