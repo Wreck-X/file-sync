@@ -11,40 +11,42 @@
         <!-- Client Registration Section -->
         <div id="register-section" class="bg-white rounded-lg shadow-md p-6 mb-6">
             <h2 class="text-2xl font-bold mb-4">Register Client</h2>
-            <p class="text-gray-600 mb-4">Register this device to synchronize files with other clients</p>
+            <p class="text-sm text-gray-600 mb-4">Register this device to synchronize files with other clients</p>
             <div class="flex flex-col sm:flex-row gap-4">
                 <div class="flex-1">
                     <label for="client-name" class="block text-sm font-medium text-gray-700">Client Name:</label>
-                    <input id="client-name" type="text" placeholder="Enter client name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+                    <input id="client-name" type="text" placeholder="Enter client name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 p-2">
                 </div>
-                <button id="register-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mt-4 sm:mt-7">Register Device</button>
+                <button id="register-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 mt-4 sm:mt-7">Register</button>
             </div>
-            <p id="register-status" class="mt-2 text-sm text-gray-600"></p>
+            <p id="status" class="mt-2 text-sm text-gray-600"></p>
         </div>
 
-        <!-- Main Application Section (Hidden until registered) -->
+        <!-- Main Application Section -->
         <div id="app-section" class="hidden">
             <!-- Header -->
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h1 class="text-3xl font-bold text-center">Distributed File Sync System</h1>
-                <div class="flex justify-between items-center mt-4">
+                <h1 class="text-3xl font-bold text-center mb-2">Distributed File Sync System</h1>
+                <div class="flex justify-between items-center">
                     <div>
                         <p id="client-info" class="text-sm text-gray-600">Client ID: Not registered</p>
                         <p id="server-info" class="text-sm text-gray-600">Server: Not connected</p>
+                        <p id="auth-status" class="text-sm text-gray-600">Auth Status: Not Authenticated</p>
+                        <button id="auth-dropbox-btn" class="text-blue-600 hover:underline text-sm">Authenticate with Dropbox</button>
                     </div>
-                    <button id="disconnect-btn" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">Disconnect</button>
+                    <button id="disconnect-btn" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Disconnect</button>
                 </div>
             </div>
 
             <!-- Files Section -->
             <div class="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h2 class="text-xl font-bold mb-4">Files (<span id="file-count">0</span>)</h2>
-                <p class="text-gray-600 mb-4">Files synchronized across all connected devices</p>
-                <div id="files-list" class="space-y-2">
+                <p class="text-sm text-gray-600 mb-4">Files synchronized across all devices</p>
+                <div id="files-list" class="space-y-4">
                     <p class="text-gray-500">Loading files...</p>
                 </div>
                 <div class="mt-6">
-                    <h3 class="text-lg font-semibold mb-2">Upload File</h3>
+                    <h3 class="text-lg font-bold mb-2">Upload File</h3>
                     <div class="flex flex-col sm:flex-row gap-4">
                         <div class="flex-1">
                             <label for="file-input" class="block text-sm font-medium text-gray-700">Select File:</label>
@@ -52,20 +54,28 @@
                         </div>
                         <div class="flex-1">
                             <label for="file-path" class="block text-sm font-medium text-gray-700">Save Path (optional):</label>
-                            <input id="file-path" type="text" placeholder="Leave empty to use original filename" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 p-2">
+                            <input id="file-path" type="text" placeholder="Leave empty to use original filename" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:ring-opacity-50 p-2">
                         </div>
                     </div>
-                    <button id="upload-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 mt-4">Upload File</button>
-                    <p id="upload-status" class="mt-2 text-sm text-gray-600"></p>
+                    <button id="upload-btn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 mt-4">Upload</button>
+                    <p id="file-status" class="mt-2 text-sm text-gray-600"></p>
+                </div>
+            </div>
+
+            <!-- Conflicts Section -->
+            <div id="conflicts-section" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+                <h2 class="text-xl font-bold mb-4">Resolve Conflicts</h2>
+                <div id="conflicts-list" class="space-y-2">
+                    <p class="text-gray-500">No conflicts</p>
                 </div>
             </div>
 
             <!-- Connected Clients Section -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-bold mb-4">Connected Clients (<span id="client-count">0</span>)</h2>
-                <p class="text-gray-600 mb-4">Currently connected devices</p>
+                <p class="text-sm text-gray-600 mb-4">Currently connected devices</p>
                 <div id="clients-list" class="space-y-2">
-                    <p class="text-gray-500">Loading clients...</p>
+                    <p class="text-gray-500">No clients connected</p>
                 </div>
             </div>
         </div>
@@ -79,24 +89,116 @@
         let clientName = null;
         let files = [];
         let clients = [];
+        let conflicts = [];
+        let isAuthenticated = false;
+        let wsRetryCount = 0;
+        const MAX_RETRIES = 5;
+        const BASE_RETRY_DELAY = 1000;
 
-        const registerSection = document.getElementById('register-section');
-        const appSection = document.getElementById('app-section');
-        const registerBtn = document.getElementById('register-btn');
-        const clientNameInput = document.getElementById('client-name');
-        const registerStatus = document.getElementById('register-status');
-        const disconnectBtn = document.getElementById('disconnect-btn');
-        const clientInfo = document.getElementById('client-info');
-        const serverInfo = document.getElementById('server-info');
-        const fileCount = document.getElementById('file-count');
-        const filesList = document.getElementById('files-list');
-        const clientCount = document.getElementById('client-count');
-        const clientsList = document.getElementById('clients-list');
-        const fileInput = document.getElementById('file-input');
-        const filePathInput = document.getElementById('file-path');
-        const uploadBtn = document.getElementById('upload-btn');
-        const uploadStatus = document.getElementById('upload-status');
+        // DOM Elements
+        const registerSection = document.querySelector('#register-section');
+        const appSection = document.querySelector('#app-section');
+        const registerBtn = document.querySelector('#register-btn');
+        const clientNameInput = document.querySelector('#client-name');
+        const status = document.querySelector('#status');
+        const disconnectBtn = document.querySelector('#disconnect-btn');
+        const clientInfo = document.querySelector('#client-info');
+        const serverInfo = document.querySelector('#server-info');
+        const authStatus = document.querySelector('#auth-status');
+        const authDropboxBtn = document.querySelector('#auth-dropbox-btn');
+        const fileCount = document.querySelector('#file-count');
+        const filesList = document.querySelector('#files-list');
+        const clientCount = document.querySelector('#client-count');
+        const clientsList = document.querySelector('#clients-list');
+        const fileInput = document.querySelector('#file-input');
+        const filePathInput = document.querySelector('#file-path');
+        const uploadBtn = document.querySelector('#upload-btn');
+        const fileStatus = document.querySelector('#file-status');
+        const conflictsSection = document.querySelector('#conflicts-section');
+        const conflictsList = document.querySelector('#conflicts-list');
 
+        // Save file locally (browser prompts download)
+        async function saveToLocal(path, content) {
+            try {
+                const blob = new Blob([atob(content)]);
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = path;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                console.log(`Saved file locally: ${path}`);
+            } catch (error) {
+                console.error('Error saving file locally:', error);
+                fileStatus.textContent = 'Failed to sync locally';
+                fileStatus.classList.add('text-red-500');
+            }
+        }
+
+        // Download file from server
+        async function downloadFile(filePath) {
+            if (!clientId) {
+                fileStatus.textContent = 'Please register a client first';
+                fileStatus.classList.add('text-red-500');
+                return;
+            }
+            try {
+                const response = await fetch(`/api/files/download?path=${encodeURIComponent(filePath)}&clientId=${encodeURIComponent(clientId)}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filePath.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    fileStatus.textContent = `Downloaded ${filePath}`;
+                    fileStatus.classList.add('text-green-600');
+                } else {
+                    const data = await response.json();
+                    fileStatus.textContent = data.error;
+                    fileStatus.classList.add('text-red-500');
+                }
+            } catch (err) {
+                console.error('Download error:', err);
+                fileStatus.textContent = 'Failed to download file';
+                fileStatus.classList.add('text-red-500');
+            }
+        }
+
+        // Check authentication status
+        async function checkAuthStatus() {
+            if (!clientId) return;
+            try {
+                const response = await fetch(`/api/auth/status?clientId=${encodeURIComponent(clientId)}`);
+                const data = await response.json();
+                isAuthenticated = data.isAuthenticated;
+                authStatus.textContent = `Auth Status: ${isAuthenticated ? 'Authenticated' : 'Not Authenticated'}`;
+                authStatus.classList.toggle('text-green-600', isAuthenticated);
+                authStatus.classList.toggle('text-red-500', !isAuthenticated);
+                sessionStorage.setItem(`auth-${clientId}`, isAuthenticated);
+            } catch (err) {
+                console.error('Error checking auth status:', err);
+                authStatus.textContent = 'Auth Status: Error';
+                authStatus.classList.add('text-red-500');
+            }
+        }
+
+        // Check client status
+        async function checkClientStatus(clientId) {
+            try {
+                const response = await fetch(`/api/client/status?clientId=${encodeURIComponent(clientId)}`);
+                const data = await response.json();
+                return data.isActive;
+            } catch (err) {
+                console.error('Error checking client status:', err);
+                return false;
+            }
+        }
+
+        // Fetch initial data
         async function fetchInitialData() {
             try {
                 const [filesResponse, clientsResponse] = await Promise.all([
@@ -105,12 +207,10 @@
                 ]);
                 if (filesResponse.ok) {
                     files = await filesResponse.json();
-                    console.log('Fetched initial files:', files);
                     updateFilesList();
                 }
                 if (clientsResponse.ok) {
                     clients = await clientsResponse.json();
-                    console.log('Fetched initial clients:', clients);
                     updateClientsList();
                 }
             } catch (error) {
@@ -121,12 +221,31 @@
         // Register client
         registerBtn.addEventListener('click', async () => {
             clientName = clientNameInput.value.trim() || 'Anonymous';
-            registerStatus.textContent = 'Registering...';
+            status.textContent = 'Registering...';
+            
+            // Load client map from localStorage
+            let clientMap = JSON.parse(localStorage.getItem('clientMap') || '{}');
+            
+            // Check if clientName has a clientId
+            let tempClientId = clientMap[clientName];
+            let isReconnect = false;
+
+            if (tempClientId) {
+                const isActive = await checkClientStatus(tempClientId);
+                if (isActive) {
+                    // If clientId is active, generate a new one
+                    status.textContent = `Client ${clientName} is already active. Registering as new client...`;
+                    tempClientId = null;
+                } else {
+                    isReconnect = true;
+                }
+            }
+
             try {
                 const response = await fetch('/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: clientName })
+                    body: JSON.stringify({ name: clientName, clientId: tempClientId })
                 });
                 if (!response.ok) {
                     throw new Error(`Registration failed: ${response.statusText}`);
@@ -134,36 +253,78 @@
                 const data = await response.json();
                 clientId = data.clientId;
                 serverAddress = data.serverAddress;
-                serverPort = data.serverPort;
+                serverPort = data.serverPort || 3000;
 
-                // Initialize WebSocket
-                initWebSocket(data.clientId);
-                registerStatus.textContent = 'Registration successful!';
-                registerStatus.classList.add('text-green-500');
+                // Update clientMap and localStorage
+                clientMap[clientName] = clientId;
+                localStorage.setItem('clientMap', JSON.stringify(clientMap));
+                // Store client state in sessionStorage
+                sessionStorage.setItem('clientId', clientId);
+                sessionStorage.setItem('clientName', clientName);
+
+                status.textContent = isReconnect ? `Reconnected as ${clientName}` : `Registered as ${clientName}`;
+                status.classList.add('text-green-600');
                 registerSection.classList.add('hidden');
                 appSection.classList.remove('hidden');
-                clientInfo.textContent = `Client ID: ${clientId} (${clientName})`;
+                clientInfo.textContent = `Client: ${clientId} (${clientName})`;
                 serverInfo.textContent = `Server: ${serverAddress}:${serverPort}`;
+                
+                // Reset WebSocket retry count
+                wsRetryCount = 0;
+                // Delay WebSocket init
+                setTimeout(() => initWebSocket(clientId), 1000);
                 fetchInitialData();
+                checkAuthStatus();
             } catch (error) {
                 console.error('Registration error:', error);
-                registerStatus.textContent = `Error: ${error.message}`;
-                registerStatus.classList.add('text-red-500');
+                status.textContent = `Error: ${error.message}`;
+                status.classList.add('text-red-600');
             }
         });
 
-        // Initialize WebSocket connection
+        // Authenticate with Dropbox
+        authDropboxBtn.addEventListener('click', async () => {
+            if (!clientId) {
+                status.textContent = 'Please register a client first';
+                status.classList.add('text-red-600');
+                return;
+            }
+            try {
+                const response = await fetch(`/auth/dropbox?clientId=${encodeURIComponent(clientId)}`);
+                const data = await response.json();
+                if (data.success) {
+                    isAuthenticated = true;
+                    sessionStorage.setItem(`auth-${clientId}`, true);
+                    authStatus.textContent = `Auth Status: Authenticated`;
+                    authStatus.classList.remove('text-red-500');
+                    authStatus.classList.add('text-green-600');
+                    status.textContent = `Authenticated with Dropbox for client ${data.clientId}`;
+                    status.classList.add('text-green-600');
+                } else {
+                    status.textContent = data.error;
+                    status.classList.add('text-red-600');
+                }
+            } catch (err) {
+                console.error('Authentication error:', err);
+                status.textContent = 'Failed to authenticate with Dropbox';
+                status.classList.add('text-red-600');
+            }
+        });
+
+        // Initialize WebSocket
         function initWebSocket(clientId) {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.close();
-                console.log('Closed existing WebSocket for client:', clientId);
+                console.log('Closed WebSocket for client:', clientId);
             }
-            const uniqueId = Date.now() + '-' + Math.random().toString(36).substring(2);
-            const wsUrl = `ws://${window.location.hostname}:${serverPort}?clientId=${clientId}&uniqueId=${uniqueId}`;
-            console.log('Connecting to WebSocket:', wsUrl);
+            const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+            const port = serverPort || 3000;
+            const wsUrl = `ws://${window.location.hostname}:${port}?clientId=${encodeURIComponent(clientId)}&uniqueId=${encodeURIComponent(uniqueId)}`;
+            console.log(`Connecting to WebSocket: ${wsUrl}`);
             ws = new WebSocket(wsUrl);
             ws.onopen = () => {
                 console.log('WebSocket connected for client:', clientId, 'state:', ws.readyState);
+                wsRetryCount = 0;
                 setInterval(() => {
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({ type: 'heartbeat' }));
@@ -177,17 +338,27 @@
                     console.log('Received WebSocket message:', JSON.stringify(data, null, 2));
                     handleWebSocketMessage(data);
                 } catch (error) {
-                    console.error('Error parsing WebSocket message:', error, 'raw data:', event.data);
+                    console.error('WebSocket message parse error:', error, 'data:', event.data);
                 }
             };
             ws.onclose = () => {
                 console.log('WebSocket closed for client:', clientId);
-                setTimeout(() => initWebSocket(clientId), 5000);
+                if (wsRetryCount < MAX_RETRIES) {
+                    const delay = BASE_RETRY_DELAY * Math.pow(2, wsRetryCount);
+                    console.log(`Retrying WebSocket in ${delay}ms...`);
+                    setTimeout(() => {
+                        wsRetryCount++;
+                        initWebSocket(clientId);
+                    }, delay);
+                } else {
+                    status.textContent = 'WebSocket connection failed after retries';
+                    status.classList.add('text-red-600');
+                }
             };
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                registerStatus.textContent = 'WebSocket connection error';
-                registerStatus.classList.add('text-red-500');
+                status.textContent = 'WebSocket connection error';
+                status.classList.add('text-red-600');
             };
         }
 
@@ -197,56 +368,61 @@
                 console.warn('Invalid WebSocket message:', data);
                 return;
             }
-            console.log('Processing message type:', data.type);
+            console.log('Processing message:', data.type);
             switch (data.type) {
                 case 'init':
-                    console.log('Before init - Files:', files.length, 'Clients:', clients.length);
                     files = data.files || [];
                     clients = data.clients || [];
-                    console.log('After init - Files:', files.length, 'Clients:', clients.length);
                     updateFilesList();
                     updateClientsList();
                     break;
                 case 'change':
-                    console.log('File change event:', data);
                     if (data.eventType === 'update' && data.file && data.file.path) {
-                        console.log('Before file update - Files:', files.length);
                         const index = files.findIndex(f => f.path === data.file.path);
                         if (index >= 0) {
                             files[index] = data.file;
                         } else {
                             files.push(data.file);
                         }
-                        console.log('After file update - Files:', files.length);
                         updateFilesList();
+                        ws.send(JSON.stringify({ type: 'sync_request', path: data.file.path }));
                     } else if (data.eventType === 'delete' && data.path) {
-                        console.log('Before file delete - Files:', files.length);
                         files = files.filter(f => f.path !== data.path);
-                        console.log('After file delete - Files:', files.length);
                         updateFilesList();
-                    } else {
-                        console.warn('Invalid change message:', data);
+                    } else if (data.eventType === 'conflict' && data.file && data.originalPath) {
+                        conflicts.push({ file: data.file, originalPath: data.originalPath });
+                        updateConflictsList();
                     }
                     break;
+                case 'file_data':
+                    saveToLocal(data.path, data.data);
+                    fileStatus.textContent = `Synced ${data.path} locally`;
+                    fileStatus.classList.add('text-green-600');
+                    const syncStatus = document.querySelector(`#sync-${data.path.replace(/[/.]/g, '-')}`);
+                    if (syncStatus) syncStatus.textContent = 'Synced';
+                    break;
+                case 'conflict_resolved':
+                    conflicts = conflicts.filter(c => c.originalPath !== data.path);
+                    updateConflictsList();
+                    fileStatus.textContent = `Conflict resolved for ${data.path}`;
+                    fileStatus.classList.add('text-green-600');
+                    break;
+                case 'error':
+                    fileStatus.textContent = data.message || 'Error occurred';
+                    fileStatus.classList.add('text-red-500');
+                    break;
                 case 'client':
-                    console.log('Client event:', data);
                     if ((data.eventType === 'client_connected' || data.eventType === 'client_registered') && data.client && data.client.id) {
-                        console.log('Before client update - Clients:', clients.length);
                         const index = clients.findIndex(c => c.id === data.client.id);
                         if (index >= 0) {
                             clients[index] = data.client;
                         } else {
                             clients.push(data.client);
                         }
-                        console.log('After client update - Clients:', clients.length);
                         updateClientsList();
                     } else if (data.eventType === 'client_disconnected' && data.clientId) {
-                        console.log('Before client delete - Clients:', clients.length);
                         clients = clients.filter(c => c.id !== data.clientId);
-                        console.log('After client delete - Clients:', clients.length);
                         updateClientsList();
-                    } else {
-                        console.warn('Invalid client message:', data);
                     }
                     break;
                 case 'heartbeat_ack':
@@ -259,10 +435,9 @@
 
         // Update files list
         function updateFilesList() {
-            console.log('Updating files list with:', files);
             filesList.innerHTML = '';
             if (files.length === 0) {
-                filesList.innerHTML = '<p class="text-gray-500">No files available</p>';
+                filesList.innerHTML = '<p class="text-sm text-gray-500">No files available</p>';
                 fileCount.textContent = '0';
                 return;
             }
@@ -272,28 +447,53 @@
                     return;
                 }
                 const fileElement = document.createElement('div');
-                fileElement.className = 'border-b py-2 flex justify-between';
+                fileElement.className = 'border-b py-2 flex flex-col sm:flex-row justify-between gap-2';
                 fileElement.dataset.path = file.path;
                 fileElement.innerHTML = `
-                    <div>
-                        <span class="font-medium">${file.path}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-sm">${file.path}</span>
                         <span class="text-sm text-gray-500">(${formatSize(file.size)})</span>
                         <span class="text-sm text-gray-500">by ${file.uploaderName || 'Unknown'}</span>
+                        <span id="sync-${file.path.replace(/[/.]/g, '-')}" class="text-sm text-yellow-600">Syncing...</span>
                     </div>
-                    <a href="/sync/${encodeURIComponent(file.path)}" download class="text-blue-500 hover:underline">Download</a>
+                    <div class="flex gap-2">
+                        <button onclick="downloadFile('${file.path}')" class="text-sm text-blue-600 hover:underline">Download</button>
+                        <a href="/sync/${encodeURIComponent(file.path)}" download class="text-sm text-blue-600 hover:underline">Sync Download</a>
+                    </div>
                 `;
                 filesList.appendChild(fileElement);
             });
             fileCount.textContent = files.length;
-            console.log('Files list updated, DOM elements:', filesList.children.length);
+        }
+
+        // Update conflicts list
+        function updateConflictsList() {
+            conflictsList.innerHTML = '';
+            if (conflicts.length === 0) {
+                conflictsSection.classList.add('hidden');
+                conflictsList.innerHTML = '<p class="text-sm text-gray-500">No conflicts</p>';
+                return;
+            }
+            conflictsSection.classList.remove('hidden');
+            conflicts.forEach(item => {
+                const conflictElement = document.createElement('div');
+                conflictElement.className = 'border-b py-2';
+                conflictElement.innerHTML = `
+                    <div class="flex flex-col gap-2">
+                        <p class="text-sm font-medium">Conflict for ${item.originalPath}</p>
+                        <p class="text-sm text-gray-600">Conflicting file: ${item.file.path} (Version ${item.file.version})</p>
+                        <button onclick="resolveConflict('${item.originalPath}', '${item.file.path}')" class="text-blue-600 hover:underline">Keep this version</button>
+                    </div>
+                `;
+                conflictsList.appendChild(conflictElement);
+            });
         }
 
         // Update clients list
         function updateClientsList() {
-            console.log('Updating clients list with:', clients);
             clientsList.innerHTML = '';
             if (clients.length === 0) {
-                clientsList.innerHTML = '<p class="text-gray-500">No clients connected</p>';
+                clientsList.innerHTML = '<p class="text-sm text-gray-500">No clients connected</p>';
                 clientCount.textContent = '0';
                 return;
             }
@@ -306,36 +506,45 @@
                 clientElement.className = 'border-b py-2';
                 clientElement.dataset.id = client.id;
                 clientElement.innerHTML = `
-                    <span class="font-medium">${client.name || 'Unknown'}</span>
+                    <span class="font-medium text-sm">${client.name || 'Anonymous'}</span>
                     <span class="text-sm text-gray-500">(${client.ipAddress}:${client.port})</span>
                 `;
                 clientsList.appendChild(clientElement);
             });
             clientCount.textContent = clients.length;
-            console.log('Clients list updated, DOM elements:', clientsList.children.length);
         }
 
-        // File upload
+        // Upload file
         uploadBtn.addEventListener('click', async () => {
+            if (!clientId) {
+                fileStatus.textContent = 'Please register a client first';
+                fileStatus.classList.add('text-red-500');
+                return;
+            }
+            if (!isAuthenticated) {
+                fileStatus.textContent = 'Please authenticate with Dropbox first';
+                fileStatus.classList.add('text-red-500');
+                return;
+            }
             if (!fileInput.files.length) {
-                uploadStatus.textContent = 'Please select a file';
-                uploadStatus.classList.add('text-red-500');
+                fileStatus.textContent = 'Please select a file';
+                fileStatus.classList.add('text-red-500');
                 return;
             }
             const file = fileInput.files[0];
             const savePath = filePathInput.value.trim() || file.name;
-            uploadStatus.textContent = 'Uploading...';
+            fileStatus.textContent = 'Uploading...';
             try {
-                const response = await fetch(`/api/files/upload?path=${encodeURIComponent(savePath)}&clientId=${clientId}`, {
+                const response = await fetch(`/api/files/upload?path=${encodeURIComponent(savePath)}&clientId=${encodeURIComponent(clientId)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': file.type },
                     body: file
                 });
                 if (!response.ok) {
-                    throw new Error(`Upload failed: ${response.statusText}`);
+                    const data = await response.json();
+                    throw new Error(data.error || `Upload failed: ${response.statusText}`);
                 }
                 const fileInfo = await response.json();
-                console.log('File uploaded:', fileInfo);
                 const index = files.findIndex(f => f.path === fileInfo.path);
                 if (index >= 0) {
                     files[index] = fileInfo;
@@ -343,20 +552,38 @@
                     files.push(fileInfo);
                 }
                 updateFilesList();
-                uploadStatus.textContent = 'File uploaded successfully! Awaiting sync...';
-                uploadStatus.classList.remove('text-red-500');
-                uploadStatus.classList.add('text-green-500');
+                fileStatus.textContent = `Uploaded ${savePath}. Syncing...`;
+                fileStatus.classList.remove('text-red-500');
+                fileStatus.classList.add('text-green-600');
                 fileInput.value = '';
                 filePathInput.value = '';
             } catch (error) {
                 console.error('Upload error:', error);
-                uploadStatus.textContent = `Error: ${error.message}`;
-                uploadStatus.classList.add('text-red-500');
+                fileStatus.textContent = `Error: ${error.message}`;
+                fileStatus.classList.add('text-red-500');
             }
         });
 
+        // Resolve conflict
+        window.resolveConflict = async function(originalPath, chosenPath) {
+            try {
+                ws.send(JSON.stringify({
+                    type: 'conflict_resolve',
+                    originalPath,
+                    chosenPath,
+                    clientId
+                }));
+                fileStatus.textContent = 'Resolving conflict...';
+                fileStatus.classList.add('text-green-600');
+            } catch (error) {
+                console.error('Error resolving conflict:', error);
+                fileStatus.textContent = 'Failed to resolve conflict';
+                fileStatus.classList.add('text-red-500');
+            }
+        };
+
         // Disconnect client
-        disconnectBtn.addEventListener('click', async () => {
+        disconnectBtn.addEventListener('click', async function() {
             try {
                 const response = await fetch('/api/disconnect', {
                     method: 'POST',
@@ -369,8 +596,8 @@
                 handleDisconnect();
             } catch (error) {
                 console.error('Disconnect error:', error);
-                registerStatus.textContent = `Error: ${error.message}`;
-                registerStatus.classList.add('text-red-500');
+                status.textContent = `Error: ${error.message}`;
+                status.classList.add('text-red-600');
             }
         });
 
@@ -378,18 +605,25 @@
             if (ws) {
                 ws.close();
             }
+            sessionStorage.removeItem('clientId');
+            sessionStorage.removeItem('clientName');
+            sessionStorage.removeItem(`auth-${clientId}`);
+            wsRetryCount = 0;
             registerSection.classList.remove('hidden');
             appSection.classList.add('hidden');
-            registerStatus.textContent = 'Disconnected. Please register again.';
-            registerStatus.classList.remove('text-green-500');
+            status.textContent = 'Disconnected. Please register again.';
+            status.classList.remove('text-green-600');
             clientId = null;
             serverAddress = null;
             serverPort = null;
             clientName = null;
+            isAuthenticated = false;
             files = [];
             clients = [];
+            conflicts = [];
             updateFilesList();
             updateClientsList();
+            updateConflictsList();
         }
 
         function formatSize(bytes) {
@@ -398,6 +632,25 @@
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Initial state
+        fetchInitialData();
+        const storedClientId = sessionStorage.getItem('clientId');
+        if (storedClientId) {
+            clientId = storedClientId;
+            clientName = sessionStorage.getItem('clientName') || 'Anonymous';
+            isAuthenticated = sessionStorage.getItem(`auth-${clientId}`) === 'true';
+            serverPort = 3000;
+            registerSection.classList.add('hidden');
+            appSection.classList.remove('hidden');
+            clientInfo.textContent = `Client: ${clientId} (${clientName})`;
+            serverInfo.textContent = `Server: ${window.location.hostname}:3000`;
+            authStatus.textContent = `Auth Status: ${isAuthenticated ? 'Authenticated' : 'Not Authenticated'}`;
+            authStatus.classList.toggle('text-green-600', isAuthenticated);
+            authStatus.classList.toggle('text-red-500', !isAuthenticated);
+            checkAuthStatus();
+            setTimeout(() => initWebSocket(clientId), 1000);
         }
     </script>
 </body>
